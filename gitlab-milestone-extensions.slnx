@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="gitlab-milestone-extensions.ApiService/gitlab-milestone-extensions.ApiService.csproj" />
+  <Project Path="gitlab-milestone-extensions.AppHost/gitlab-milestone-extensions.AppHost.csproj" />
+  <Project Path="gitlab-milestone-extensions.ServiceDefaults/gitlab-milestone-extensions.ServiceDefaults.csproj" />
+  <Project Path="gitlab-milestone-extensions.Tests/gitlab-milestone-extensions.Tests.csproj" />
+  <Project Path="gitlab-milestone-extensions.Web/gitlab-milestone-extensions.Web.csproj" />
+</Solution>

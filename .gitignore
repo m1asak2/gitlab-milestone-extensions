@@ -1,0 +1,12 @@
+*.lock
+*.cache
+*.exe
+*.csproj.user
+.vs
+obj
+bin
+/packages
+tmp
+~$*
+.~lock*
+FolderProfile.pubxml.user
