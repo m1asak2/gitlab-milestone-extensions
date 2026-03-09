@@ -2,64 +2,72 @@
 
 GitLab CE のマイルストーン、Issue、担当者情報を可視化するための表示専用ダッシュボードです。
 
-## Purpose
-GitLab 標準画面だけでは把握しづらい以下を見やすく表示します。
+## 目的
+
+GitLab 標準画面だけでは把握しづらい以下の情報を見やすく表示します。
 
 - グループ別の進捗
 - プロジェクト別の進捗
 - 担当者別の進捗
 - マイルストーン一覧
 - Issue 一覧
-- サマリー指標
-- ガント風タイムライン表示
+- ガント風のタイムライン表示
+- サマリー指標の表示
 
-## Non-Goals
-このアプリは表示専用です。
+## 前提
 
-- GitLab への更新は行いません
-- Milestone / Issue の編集は行いません
-- GitLab へ書き戻しません
+このリポジトリは、Visual Studio で作成した **Aspire Starter App** の雛形をベースに構築します。
 
-## Architecture
-- Backend: ASP.NET Core Minimal API
-- Frontend: Blazor WebAssembly
-- UI: MudBlazor
-- Data Source: GitLab REST API
-- Cache: IMemoryCache
+Aspire Starter App により生成される以下は、開発体験向上のため維持します。
 
-## Solution Structure
-- `Domain`: ドメインモデル
-- `Application`: DTO、集計、クエリ
-- `Infrastructure`: GitLab API 通信、キャッシュ、設定
-- `Api`: Minimal API エンドポイント
-- `Web`: Blazor WASM + MudBlazor UI
+- `AppHost`
+- `ServiceDefaults`
 
-## Main Screens
-1. Dashboard
-2. Gantt
-3. Issues
-4. Milestones
+一方で、本プロジェクトに不要なサンプルコードや初期ファイルは削除します。
 
-## API Overview
-- `GET /api/summary`
-- `GET /api/gantt`
-- `GET /api/issues`
-- `GET /api/milestones`
-- `GET /api/master/groups`
-- `GET /api/master/projects`
-- `GET /api/master/assignees`
+## 技術方針
 
-## GitLab Configuration
-GitLab の Personal Access Token または Access Token を使用して、バックエンドから GitLab REST API を呼び出します。
+- .NET 10
+- ASP.NET Core Minimal API
+- Blazor
+- MudBlazor
+- Aspire AppHost
+- Aspire ServiceDefaults
 
-### appsettings.Development.json example
-```json
-{
-  "GitLab": {
-    "BaseUrl": "http://gitlab.local",
-    "PrivateToken": "YOUR_TOKEN",
-    "GroupIds": [ 1 ],
-    "ProjectIds": [],
-    "CacheMinutes": 5
-  }
-}
+## 開発環境
+
+- Visual Studio
+- VSCode
+- VSCode 上では Codex を利用して実装支援を行う
+
+## スコープ
+
+このアプリは **表示専用** です。
+
+### 実施すること
+- GitLab API からデータ取得
+- ダッシュボード表示
+- テーブル表示
+- ガント風表示
+- フィルタ表示
+
+### 実施しないこと
+- GitLab の Issue / Milestone 編集
+- GitLab への書き戻し
+- ローカル DB 永続化
+- 背景ジョブ
+- Webhook 連携
+- 認証の作り込み（初期段階では対象外）
+
+## ベース構成
+
+Aspire 雛形をベースに、必要最小限の構成へ整理します。
+
+想定構成:
+
+```text
+src/
+├─ gitlab-milestone-extensions.AppHost/
+├─ gitlab-milestone-extensions.ServiceDefaults/
+├─ gitlab-milestone-extensions.Api/
+└─ gitlab-milestone-extensions.Web/

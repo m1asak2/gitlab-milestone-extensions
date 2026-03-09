@@ -10,3 +10,4 @@ tmp
 ~$*
 .~lock*
 FolderProfile.pubxml.user
+*.log

@@ -1,0 +1,38 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "AppHost",
+      "type": "dotnet",
+      "request": "launch",
+      "projectPath": "${workspaceFolder}/gitlab-milestone-extensions.AppHost/gitlab-milestone-extensions.AppHost.csproj",
+      "preLaunchTask": "build-solution",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    {
+      "name": "ApiService",
+      "type": "dotnet",
+      "request": "launch",
+      "projectPath": "${workspaceFolder}/gitlab-milestone-extensions.ApiService/gitlab-milestone-extensions.ApiService.csproj",
+      "preLaunchTask": "build-solution",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    {
+      "name": "Web",
+      "type": "dotnet",
+      "request": "launch",
+      "projectPath": "${workspaceFolder}/gitlab-milestone-extensions.Web/gitlab-milestone-extensions.Web.csproj",
+      "preLaunchTask": "build-solution",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  ]
+}

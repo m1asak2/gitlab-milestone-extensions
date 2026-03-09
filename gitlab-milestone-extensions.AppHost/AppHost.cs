@@ -5,7 +5,6 @@ var apiService = builder.AddProject<Projects.gitlab_milestone_extensions_ApiServ
 
 builder.AddProject<Projects.gitlab_milestone_extensions_Web>("webfrontend")
     .WithExternalHttpEndpoints()
-    .WithHttpHealthCheck("/health")
     .WithReference(apiService)
     .WaitFor(apiService);
 

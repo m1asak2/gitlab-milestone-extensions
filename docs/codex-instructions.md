@@ -1,5 +1,15 @@
 # GitLab Milestone Dashboard - Codex Instructions
 
+## 重要な前提
+
+このリポジトリは **Visual Studio の Aspire Starter App** をベースにしています。
+
+そのため、以下は維持してください。
+
+- `AppHost`
+- `ServiceDefaults`
+
+不要なサンプルコードやテンプレート生成物は削除して構いませんが、Aspire の土台は残してください。
 ## Goal
 Build a read-only dashboard for GitLab CE milestones, issues, and assignees.
 

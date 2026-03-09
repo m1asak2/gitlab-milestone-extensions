@@ -1,0 +1,27 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build-solution",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "build",
+        "${workspaceFolder}/gitlab-milestone-extensions.slnx"
+      ],
+      "problemMatcher": "$msCompile",
+      "group": "build"
+    },
+    {
+      "label": "run-apphost",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "run",
+        "--project",
+        "${workspaceFolder}/gitlab-milestone-extensions.AppHost/gitlab-milestone-extensions.AppHost.csproj"
+      ],
+      "problemMatcher": "$msCompile"
+    }
+  ]
+}

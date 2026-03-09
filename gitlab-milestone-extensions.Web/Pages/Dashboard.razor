@@ -1,0 +1,139 @@
+@page "/"
+@page "/dashboard"
+@inject DashboardApiClient ApiClient
+
+<PageTitle>Dashboard</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Dashboard</MudText>
+
+@if (_isLoading)
+{
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+}
+else if (!string.IsNullOrWhiteSpace(_errorMessage))
+{
+    <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
+}
+else
+{
+    <MudGrid Class="mb-4">
+        <MudItem xs="12" sm="6" lg="3">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.caption">Total Issues</MudText>
+                <MudText Typo="Typo.h5">@_summary?.TotalIssues</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" lg="3">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.caption">Open Issues</MudText>
+                <MudText Typo="Typo.h5">@_summary?.OpenIssues</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" lg="3">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.caption">Closed Issues</MudText>
+                <MudText Typo="Typo.h5">@_summary?.ClosedIssues</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" lg="3">
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.caption">Overdue Issues</MudText>
+                <MudText Typo="Typo.h5">@_summary?.OverdueIssues</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <MudTabs>
+        <MudTabPanel Text="Issues">
+            <MudTable Items="_issues">
+                <HeaderContent>
+                    <MudTh>Id</MudTh>
+                    <MudTh>Title</MudTh>
+                    <MudTh>Project</MudTh>
+                    <MudTh>Assignee</MudTh>
+                    <MudTh>State</MudTh>
+                    <MudTh>Milestone</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Id">@context.Id</MudTd>
+                    <MudTd DataLabel="Title">@context.Title</MudTd>
+                    <MudTd DataLabel="Project">@context.ProjectName</MudTd>
+                    <MudTd DataLabel="Assignee">@context.Assignee</MudTd>
+                    <MudTd DataLabel="State">@context.State</MudTd>
+                    <MudTd DataLabel="Milestone">@context.Milestone</MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudTabPanel>
+        <MudTabPanel Text="Milestones">
+            <MudTable Items="_milestones">
+                <HeaderContent>
+                    <MudTh>Title</MudTh>
+                    <MudTh>Project</MudTh>
+                    <MudTh>Start</MudTh>
+                    <MudTh>Due</MudTh>
+                    <MudTh>Progress</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Title">@context.Title</MudTd>
+                    <MudTd DataLabel="Project">@context.ProjectName</MudTd>
+                    <MudTd DataLabel="Start">@context.StartDate?.ToString("yyyy-MM-dd")</MudTd>
+                    <MudTd DataLabel="Due">@context.DueDate?.ToString("yyyy-MM-dd")</MudTd>
+                    <MudTd DataLabel="Progress">
+                        <MudProgressLinear Color="Color.Primary" Value="@context.Progress" />
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudTabPanel>
+        <MudTabPanel Text="Gantt">
+            <MudTable Items="_ganttItems">
+                <HeaderContent>
+                    <MudTh>Title</MudTh>
+                    <MudTh>Mode</MudTh>
+                    <MudTh>Owner</MudTh>
+                    <MudTh>Start</MudTh>
+                    <MudTh>End</MudTh>
+                    <MudTh>Progress</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Title">@context.Title</MudTd>
+                    <MudTd DataLabel="Mode">@context.ViewMode</MudTd>
+                    <MudTd DataLabel="Owner">@context.Owner</MudTd>
+                    <MudTd DataLabel="Start">@context.StartDate.ToString("yyyy-MM-dd")</MudTd>
+                    <MudTd DataLabel="End">@context.EndDate.ToString("yyyy-MM-dd")</MudTd>
+                    <MudTd DataLabel="Progress">
+                        <MudProgressLinear Color="Color.Secondary" Value="@context.Progress" />
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudTabPanel>
+    </MudTabs>
+}
+
+@code {
+    private bool _isLoading = true;
+    private string? _errorMessage;
+    private SummaryViewModel? _summary;
+    private IReadOnlyList<IssueViewModel> _issues = [];
+    private IReadOnlyList<MilestoneViewModel> _milestones = [];
+    private IReadOnlyList<GanttItemViewModel> _ganttItems = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var dashboardData = await ApiClient.GetDashboardDataAsync();
+            _summary = dashboardData.Summary;
+            _issues = dashboardData.Issues;
+            _milestones = dashboardData.Milestones;
+            _ganttItems = dashboardData.GanttItems;
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}
