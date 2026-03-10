@@ -1,4 +1,5 @@
 using System.Net.Http.Headers;
+using System.Diagnostics;
 using System.Text.Json.Serialization;
 using gitlab_milestone_extensions.ApiService.Models;
 using gitlab_milestone_extensions.ApiService.Options;
@@ -10,11 +11,13 @@ public class GitLabApiClient
 {
     private readonly HttpClient _httpClient;
     private readonly int _groupId;
+    private readonly ILogger<GitLabApiClient> _logger;
 
-    public GitLabApiClient(HttpClient httpClient, IOptions<GitLabOptions> options)
+    public GitLabApiClient(HttpClient httpClient, IOptions<GitLabOptions> options, ILogger<GitLabApiClient> logger)
     {
         var opt = options.Value;
         _groupId = opt.GroupId;
+        _logger = logger;
 
         httpClient.BaseAddress = new Uri($"{opt.BaseUrl.TrimEnd('/')}/api/v4/");
         httpClient.DefaultRequestHeaders.Remove("PRIVATE-TOKEN");
@@ -32,9 +35,15 @@ public class GitLabApiClient
 
     public async Task<IReadOnlyList<GitLabProjectDto>> GetProjectsAsync(CancellationToken cancellationToken = default)
     {
+        var stopwatch = Stopwatch.StartNew();
         var projects = await GetAsync<List<GitLabProjectResponse>>(
             $"groups/{_groupId}/projects?per_page=100",
             cancellationToken) ?? [];
+        stopwatch.Stop();
+        _logger.LogInformation(
+            "GitLab projects fetched in {ElapsedMs}ms. Count={Count}",
+            stopwatch.ElapsedMilliseconds,
+            projects.Count);
 
         return projects
             .Select(p => new GitLabProjectDto(p.Id, p.Name))
@@ -44,6 +53,14 @@ public class GitLabApiClient
     public async Task<IReadOnlyList<GitLabMilestoneDto>> GetProjectMilestonesAsync(CancellationToken cancellationToken = default)
     {
         var projects = await GetProjectsAsync(cancellationToken);
+        return await GetProjectMilestonesAsync(projects, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<GitLabMilestoneDto>> GetProjectMilestonesAsync(
+        IReadOnlyList<GitLabProjectDto> projects,
+        CancellationToken cancellationToken = default)
+    {
+        var stopwatch = Stopwatch.StartNew();
 
         var milestoneTasks = projects.Select(async project =>
         {
@@ -62,12 +79,28 @@ public class GitLabApiClient
         });
 
         var resultByProject = await Task.WhenAll(milestoneTasks);
-        return resultByProject.SelectMany(x => x).ToList();
+        var results = resultByProject.SelectMany(x => x).ToList();
+        stopwatch.Stop();
+        _logger.LogInformation(
+            "GitLab project milestones fetched in {ElapsedMs}ms. ProjectCount={ProjectCount}, MilestoneCount={MilestoneCount}",
+            stopwatch.ElapsedMilliseconds,
+            projects.Count,
+            results.Count);
+
+        return results;
     }
 
     public async Task<IReadOnlyList<GitLabIssueDto>> GetProjectIssuesAsync(CancellationToken cancellationToken = default)
     {
         var projects = await GetProjectsAsync(cancellationToken);
+        return await GetProjectIssuesAsync(projects, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<GitLabIssueDto>> GetProjectIssuesAsync(
+        IReadOnlyList<GitLabProjectDto> projects,
+        CancellationToken cancellationToken = default)
+    {
+        var stopwatch = Stopwatch.StartNew();
 
         var issueTasks = projects.Select(async project =>
         {
@@ -88,7 +121,15 @@ public class GitLabApiClient
         });
 
         var resultByProject = await Task.WhenAll(issueTasks);
-        return resultByProject.SelectMany(x => x).ToList();
+        var results = resultByProject.SelectMany(x => x).ToList();
+        stopwatch.Stop();
+        _logger.LogInformation(
+            "GitLab project issues fetched in {ElapsedMs}ms. ProjectCount={ProjectCount}, IssueCount={IssueCount}",
+            stopwatch.ElapsedMilliseconds,
+            projects.Count,
+            results.Count);
+
+        return results;
     }
 
     private sealed record GitLabProjectResponse(

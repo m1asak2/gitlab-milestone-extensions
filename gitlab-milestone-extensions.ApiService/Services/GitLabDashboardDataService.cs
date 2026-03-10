@@ -3,14 +3,15 @@ using gitlab_milestone_extensions.ApiService.Models;
 namespace gitlab_milestone_extensions.ApiService.Services;
 
 /// <summary>
-/// Read-only dashboard data provider backed by GitLab project milestones/issues.
+/// Read-only dashboard data provider backed by a cached GitLab snapshot.
 /// </summary>
-public sealed class GitLabDashboardDataService(GitLabApiClient gitLabApiClient) : IDashboardDataService
+public sealed class GitLabDashboardDataService(IGitLabDataSnapshotService snapshotService) : IDashboardDataService
 {
     public async Task<SummaryDto> GetSummaryAsync(CancellationToken cancellationToken)
     {
-        var issues = await BuildDashboardIssuesAsync(cancellationToken);
-        var milestones = await BuildDashboardMilestonesAsync(issues, cancellationToken);
+        var snapshot = await snapshotService.GetSnapshotAsync(cancellationToken);
+        var issues = BuildDashboardIssues(snapshot.Issues);
+        var milestones = BuildDashboardMilestones(snapshot.Milestones, issues);
 
         var openIssues = issues.Count(i => i.State.Equals("opened", StringComparison.OrdinalIgnoreCase));
         var closedIssues = issues.Count(i => i.State.Equals("closed", StringComparison.OrdinalIgnoreCase));
@@ -29,19 +30,22 @@ public sealed class GitLabDashboardDataService(GitLabApiClient gitLabApiClient) 
 
     public async Task<IReadOnlyList<DashboardIssue>> GetIssuesAsync(CancellationToken cancellationToken)
     {
-        return await BuildDashboardIssuesAsync(cancellationToken);
+        var snapshot = await snapshotService.GetSnapshotAsync(cancellationToken);
+        return BuildDashboardIssues(snapshot.Issues);
     }
 
     public async Task<IReadOnlyList<DashboardMilestone>> GetMilestonesAsync(CancellationToken cancellationToken)
     {
-        var issues = await BuildDashboardIssuesAsync(cancellationToken);
-        return await BuildDashboardMilestonesAsync(issues, cancellationToken);
+        var snapshot = await snapshotService.GetSnapshotAsync(cancellationToken);
+        var issues = BuildDashboardIssues(snapshot.Issues);
+        return BuildDashboardMilestones(snapshot.Milestones, issues);
     }
 
     public async Task<IReadOnlyList<GanttItemDto>> GetGanttAsync(string? viewMode, CancellationToken cancellationToken)
     {
         var mode = string.IsNullOrWhiteSpace(viewMode) ? "project" : viewMode.Trim().ToLowerInvariant();
-        var issues = await BuildDashboardIssuesAsync(cancellationToken);
+        var snapshot = await snapshotService.GetSnapshotAsync(cancellationToken);
+        var issues = BuildDashboardIssues(snapshot.Issues);
         var today = DateOnly.FromDateTime(DateTime.Today);
 
         var items = issues
@@ -66,10 +70,8 @@ public sealed class GitLabDashboardDataService(GitLabApiClient gitLabApiClient) 
         return items;
     }
 
-    private async Task<List<DashboardIssue>> BuildDashboardIssuesAsync(CancellationToken cancellationToken)
+    private static List<DashboardIssue> BuildDashboardIssues(IReadOnlyList<GitLabIssueDto> gitLabIssues)
     {
-        var gitLabIssues = await gitLabApiClient.GetProjectIssuesAsync(cancellationToken);
-
         return gitLabIssues
             .Select(i => new DashboardIssue(
                 ProjectName: i.ProjectName,
@@ -82,12 +84,10 @@ public sealed class GitLabDashboardDataService(GitLabApiClient gitLabApiClient) 
             .ToList();
     }
 
-    private async Task<IReadOnlyList<DashboardMilestone>> BuildDashboardMilestonesAsync(
-        IReadOnlyList<DashboardIssue> dashboardIssues,
-        CancellationToken cancellationToken)
+    private static IReadOnlyList<DashboardMilestone> BuildDashboardMilestones(
+        IReadOnlyList<GitLabMilestoneDto> gitLabMilestones,
+        IReadOnlyList<DashboardIssue> dashboardIssues)
     {
-        var gitLabMilestones = await gitLabApiClient.GetProjectMilestonesAsync(cancellationToken);
-
         var issueCountByMilestone = dashboardIssues
             .Where(i => !string.IsNullOrWhiteSpace(i.MilestoneTitle))
             .GroupBy(i => new { i.ProjectName, i.MilestoneTitle })
