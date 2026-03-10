@@ -11,7 +11,8 @@ public sealed record SummaryDto(
     int TotalIssues,
     int OpenIssues,
     int ClosedIssues,
-    int OverdueIssues);
+    int OverdueIssues,
+    int TotalMilestones = 0);
 
 /// <summary>
 /// Issue row used by the issues table.
@@ -23,14 +24,18 @@ public sealed record SummaryDto(
 /// <param name="State">Issue state.</param>
 /// <param name="Milestone">Milestone title.</param>
 /// <param name="DueDate">Due date.</param>
-public sealed record IssueDto(
-    int Id,
-    string Title,
+public sealed record DashboardIssue(
     string ProjectName,
-    string Assignee,
+    string MilestoneTitle,
+    string Title,
     string State,
-    string Milestone,
-    DateOnly? DueDate);
+    string AssigneeName,
+    DateOnly? DueDate,
+    int Id = 0)
+{
+    public string Assignee => AssigneeName;
+    public string Milestone => MilestoneTitle;
+}
 
 /// <summary>
 /// Milestone row used by the milestone table.
@@ -41,13 +46,25 @@ public sealed record IssueDto(
 /// <param name="StartDate">Start date.</param>
 /// <param name="DueDate">Due date.</param>
 /// <param name="Progress">Progress percentage from 0 to 100.</param>
-public sealed record MilestoneDto(
-    int Id,
-    string Title,
+public sealed record DashboardMilestone(
     string ProjectName,
+    string Title,
+    string State,
     DateOnly? StartDate,
     DateOnly? DueDate,
-    int Progress);
+    int OpenIssues,
+    int ClosedIssues,
+    int Id = 0)
+{
+    public int Progress
+    {
+        get
+        {
+            var total = OpenIssues + ClosedIssues;
+            return total == 0 ? 0 : (int)Math.Round((double)ClosedIssues / total * 100);
+        }
+    }
+}
 
 /// <summary>
 /// Timeline item for gantt-like visualization.

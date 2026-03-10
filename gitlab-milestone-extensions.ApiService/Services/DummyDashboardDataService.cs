@@ -20,30 +20,30 @@ public sealed class DummyDashboardDataService : IDashboardDataService
     }
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<IssueDto>> GetIssuesAsync(CancellationToken cancellationToken)
+    public Task<IReadOnlyList<DashboardIssue>> GetIssuesAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        IReadOnlyList<IssueDto> items =
+        IReadOnlyList<DashboardIssue> items =
         [
-            new IssueDto(101, "API endpoint skeleton", "Dashboard.Api", "Alice", "opened", "MVP Sprint 1", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(2))),
-            new IssueDto(102, "Blazor dashboard shell", "Dashboard.Web", "Bob", "opened", "MVP Sprint 1", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(4))),
-            new IssueDto(103, "Milestone progress card", "Dashboard.Web", "Carla", "closed", "MVP Sprint 1", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1))),
-            new IssueDto(104, "Dummy gantt API data", "Dashboard.Api", "Dan", "opened", "MVP Sprint 2", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(6)))
+            new DashboardIssue("Dashboard.Api", "MVP Sprint 1", "API endpoint skeleton", "opened", "Alice", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(2)), 101),
+            new DashboardIssue("Dashboard.Web", "MVP Sprint 1", "Blazor dashboard shell", "opened", "Bob", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(4)), 102),
+            new DashboardIssue("Dashboard.Web", "MVP Sprint 1", "Milestone progress card", "closed", "Carla", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1)), 103),
+            new DashboardIssue("Dashboard.Api", "MVP Sprint 2", "Dummy gantt API data", "opened", "Dan", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(6)), 104)
         ];
 
         return Task.FromResult(items);
     }
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<MilestoneDto>> GetMilestonesAsync(CancellationToken cancellationToken)
+    public Task<IReadOnlyList<DashboardMilestone>> GetMilestonesAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        IReadOnlyList<MilestoneDto> items =
+        IReadOnlyList<DashboardMilestone> items =
         [
-            new MilestoneDto(201, "MVP Sprint 1", "Dashboard", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-7)), DateOnly.FromDateTime(DateTime.UtcNow.AddDays(7)), 62),
-            new MilestoneDto(202, "MVP Sprint 2", "Dashboard", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(8)), DateOnly.FromDateTime(DateTime.UtcNow.AddDays(21)), 8)
+            new DashboardMilestone("Dashboard", "MVP Sprint 1", "active", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-7)), DateOnly.FromDateTime(DateTime.UtcNow.AddDays(7)), 3, 5, 201),
+            new DashboardMilestone("Dashboard", "MVP Sprint 2", "active", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(8)), DateOnly.FromDateTime(DateTime.UtcNow.AddDays(21)), 11, 1, 202)
         ];
 
         return Task.FromResult(items);

@@ -83,7 +83,8 @@ public class GitLabApiClient
                 i.Title,
                 i.State,
                 i.Milestone?.Title,
-                i.Assignee?.Name ?? i.Assignees?.FirstOrDefault()?.Name));
+                i.Assignee?.Name ?? i.Assignees?.FirstOrDefault()?.Name,
+                i.DueDate));
         });
 
         var resultByProject = await Task.WhenAll(issueTasks);
@@ -106,6 +107,7 @@ public class GitLabApiClient
         [property: JsonPropertyName("iid")] int Iid,
         [property: JsonPropertyName("title")] string Title,
         [property: JsonPropertyName("state")] string State,
+        [property: JsonPropertyName("due_date")] DateOnly? DueDate,
         [property: JsonPropertyName("milestone")] GitLabIssueMilestoneResponse? Milestone,
         [property: JsonPropertyName("assignee")] GitLabIssueAssigneeResponse? Assignee,
         [property: JsonPropertyName("assignees")] IReadOnlyList<GitLabIssueAssigneeResponse>? Assignees);

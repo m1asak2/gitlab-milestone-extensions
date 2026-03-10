@@ -19,14 +19,14 @@ public interface IDashboardDataService
     /// </summary>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Issue list.</returns>
-    Task<IReadOnlyList<IssueDto>> GetIssuesAsync(CancellationToken cancellationToken);
+    Task<IReadOnlyList<DashboardIssue>> GetIssuesAsync(CancellationToken cancellationToken);
 
     /// <summary>
     /// Gets milestone rows.
     /// </summary>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Milestone list.</returns>
-    Task<IReadOnlyList<MilestoneDto>> GetMilestonesAsync(CancellationToken cancellationToken);
+    Task<IReadOnlyList<DashboardMilestone>> GetMilestonesAsync(CancellationToken cancellationToken);
 
     /// <summary>
     /// Gets gantt-like timeline rows.

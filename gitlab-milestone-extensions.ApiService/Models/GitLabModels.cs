@@ -21,4 +21,5 @@ public sealed record GitLabIssueDto(
     string Title,
     string State,
     string? MilestoneTitle,
-    string? AssigneeName);
+    string? AssigneeName,
+    DateOnly? DueDate);

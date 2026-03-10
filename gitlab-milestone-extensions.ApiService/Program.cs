@@ -19,7 +19,7 @@ builder.Services.AddCors(options =>
             .AllowAnyMethod();
     });
 });
-builder.Services.AddSingleton<IDashboardDataService, DummyDashboardDataService>();
+builder.Services.AddScoped<IDashboardDataService, GitLabDashboardDataService>();
 
 var app = builder.Build();
 
