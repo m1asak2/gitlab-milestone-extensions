@@ -1,5 +1,6 @@
 using gitlab_milestone_extensions.ApiService.Endpoints;
 using gitlab_milestone_extensions.ApiService.Services;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -25,6 +26,7 @@ app.UseCors();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.MapScalarApiReference();
 }
 
 app.MapDashboardEndpoints();
