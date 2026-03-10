@@ -41,18 +41,26 @@ public sealed class GitLabDashboardDataService(GitLabApiClient gitLabApiClient) 
     public async Task<IReadOnlyList<GanttItemDto>> GetGanttAsync(string? viewMode, CancellationToken cancellationToken)
     {
         var mode = string.IsNullOrWhiteSpace(viewMode) ? "project" : viewMode.Trim().ToLowerInvariant();
-        var milestones = await GetMilestonesAsync(cancellationToken);
+        var issues = await BuildDashboardIssuesAsync(cancellationToken);
+        var today = DateOnly.FromDateTime(DateTime.Today);
 
-        var items = milestones
-            .Where(m => m.StartDate.HasValue && m.DueDate.HasValue)
-            .Select((m, index) => new GanttItemDto(
-                Id: m.Id == 0 ? index + 1 : m.Id,
-                Title: m.Title,
-                ViewMode: mode,
-                Owner: m.ProjectName,
-                StartDate: m.StartDate!.Value,
-                EndDate: m.DueDate!.Value,
-                Progress: m.Progress))
+        var items = issues
+            .Select((issue, index) =>
+            {
+                var endDate = issue.DueDate ?? today;
+                var startDate = issue.DueDate?.AddDays(-7) ?? today;
+                var milestoneTitle = string.IsNullOrWhiteSpace(issue.MilestoneTitle) ? "(No milestone)" : issue.MilestoneTitle;
+                var progress = issue.State.Equals("closed", StringComparison.OrdinalIgnoreCase) ? 100 : 0;
+
+                return new GanttItemDto(
+                    Id: issue.Id == 0 ? index + 1 : issue.Id,
+                    Title: $"{milestoneTitle} | {issue.Title}",
+                    ViewMode: mode,
+                    Owner: issue.ProjectName,
+                    StartDate: startDate,
+                    EndDate: endDate,
+                    Progress: progress);
+            })
             .ToList();
 
         return items;

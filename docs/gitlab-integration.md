@@ -370,3 +370,250 @@ start date が無ければ null でよい。
 - `/api/summary` が GitLab issue から算出される
 - `/api/gantt` が簡易データを返す
 - ダミーデータ依存が主要 endpoint から除去されている
+
+
+---
+
+# Phase 4: API品質改善（Pagination / Cache / Filter）
+
+## 目的
+
+このフェーズでは GitLab API を実運用レベルで利用できるように改善する。
+
+GitLab REST API には以下の特性がある。
+
+- デフォルトでページネーションされる
+- 1リクエストの取得件数が制限されている
+- 多数の API を呼び出すと遅くなる
+- Rate Limit が存在する
+
+そのため、以下を実装する。
+
+- Pagination 対応
+- GitLab API 呼び出し戦略の整理
+- API レスポンスキャッシュ
+- フィルタ機能
+
+---
+
+# Step 17: Pagination対応
+
+GitLab API はデフォルトでページネーションされる。
+
+デフォルト取得件数: 20
+
+そのため、ページをループして全件取得する必要がある。
+
+まず `per_page=100` を使用する。
+
+例:
+```
+GET /projects/{projectId}/issues?per_page=100&page=1
+```
+---
+
+## Pagination実装例
+
+GitLabApiClient に以下のメソッドを追加する。
+
+```csharp
+public async Task<List<T>> GetPagedAsync<T>(string url)
+{
+    var results = new List<T>();
+    var page = 1;
+
+    while (true)
+    {
+        var response = await _httpClient.GetFromJsonAsync<List<T>>(
+            $"{url}?per_page=100&page={page}");
+
+        if (response == null || response.Count == 0)
+            break;
+
+        results.AddRange(response);
+
+        if (response.Count < 100)
+            break;
+
+        page++;
+    }
+
+    return results;
+}
+```
+
+------
+
+# Step 18: Issue取得戦略
+
+Issue を取得する方法は複数ある。
+
+```
+/projects/:id/issues
+/groups/:id/issues
+/search
+```
+
+今回のダッシュボードでは以下を採用する。
+
+```
+projects/{projectId}/issues
+```
+
+理由:
+
+- milestone 情報が確実に取れる
+- project name を紐付けやすい
+- APIの挙動が安定している
+
+------
+
+# Step 19: Milestone取得戦略
+
+Milestone は以下を対象とする。
+
+```
+projects/{projectId}/milestones
+```
+
+この段階では以下は対象外とする。
+
+```
+groups/{groupId}/milestones
+```
+
+理由:
+
+- project milestone が一般的
+- issue は project 単位
+- group milestone は運用依存が大きい
+
+------
+
+# Step 20: API呼び出しフロー
+
+最終的な GitLab API 呼び出し順序は以下とする。
+
+```
+groups/{groupId}/projects
+        ↓
+projects/{projectId}/milestones
+        ↓
+projects/{projectId}/issues
+```
+
+この結果を Dashboard DTO に変換する。
+
+------
+
+# Step 21: APIキャッシュ
+
+GitLab API を毎回呼び出すと遅くなるため、簡易キャッシュを入れる。
+
+ASP.NET Core の `IMemoryCache` を使用する。
+
+キャッシュ対象:
+
+```
+projects
+milestones
+issues
+```
+
+キャッシュ時間:
+
+```
+5分
+```
+
+------
+
+## キャッシュ実装例
+
+```
+public async Task<List<DashboardIssue>> GetIssuesAsync()
+{
+    return await _cache.GetOrCreateAsync("gitlab_issues", async entry =>
+    {
+        entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5);
+
+        return await FetchIssuesFromGitLab();
+    });
+}
+```
+
+------
+
+# Step 22: Filter対応
+
+API に基本的なフィルタを追加する。
+
+対象:
+
+```
+project
+milestone
+assignee
+state
+```
+
+例:
+
+```
+GET /api/issues?project=api&state=opened
+```
+
+------
+
+## Filter実装例
+
+```
+app.MapGet("/api/issues", (string? project, string? state) =>
+{
+    var query = issues.AsQueryable();
+
+    if (!string.IsNullOrEmpty(project))
+        query = query.Where(x => x.ProjectName == project);
+
+    if (!string.IsNullOrEmpty(state))
+        query = query.Where(x => x.State == state);
+
+    return query.ToList();
+});
+```
+
+------
+
+# Step 23: Web UI Filter
+
+Web UI に以下のフィルタを追加する。
+
+```
+Project
+Milestone
+Assignee
+State
+```
+
+MudBlazor のコンポーネントを使用する。
+
+例:
+
+```
+MudSelect
+MudAutocomplete
+MudChip
+```
+
+------
+
+# このフェーズの完了条件
+
+以下が成立すれば Phase4 完了とする。
+
+- GitLab API が pagination 対応
+- 全 issue が取得できる
+- milestone が正しく集計される
+- API レスポンスがキャッシュされる
+- `/api/issues` にフィルタが追加される
+- Web UI に基本フィルタが追加される
