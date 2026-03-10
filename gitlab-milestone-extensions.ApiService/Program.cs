@@ -1,4 +1,5 @@
 using gitlab_milestone_extensions.ApiService.Endpoints;
+using gitlab_milestone_extensions.ApiService.Options;
 using gitlab_milestone_extensions.ApiService.Services;
 using Scalar.AspNetCore;
 
@@ -7,6 +8,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
+builder.Services.Configure<GitLabOptions>(builder.Configuration.GetSection("GitLab"));
+builder.Services.AddHttpClient<GitLabApiClient>();
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
@@ -30,6 +33,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapDashboardEndpoints();
+app.MapGitLabEndpoints();
 app.MapDefaultEndpoints();
 
 app.Run();

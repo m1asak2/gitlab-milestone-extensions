@@ -11,3 +11,5 @@ tmp
 .~lock*
 FolderProfile.pubxml.user
 *.log
+artifacts
+gitlab-milestone-extensions.ApiService/.appsettings.Development.json
