@@ -1,5 +1,5 @@
-using System.Net.Http.Headers;
 using System.Diagnostics;
+using System.Net.Http.Headers;
 using System.Text.Json.Serialization;
 using gitlab_milestone_extensions.ApiService.Models;
 using gitlab_milestone_extensions.ApiService.Options;
@@ -28,9 +28,29 @@ public class GitLabApiClient
         _httpClient = httpClient;
     }
 
-    public Task<T?> GetAsync<T>(string url, CancellationToken cancellationToken = default)
+    public async Task<T?> GetAsync<T>(string url, CancellationToken cancellationToken = default)
     {
-        return _httpClient.GetFromJsonAsync<T>(url, cancellationToken);
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            var result = await _httpClient.GetFromJsonAsync<T>(url, cancellationToken);
+            stopwatch.Stop();
+            _logger.LogInformation(
+                "GitLab API GET {Url} completed in {ElapsedMs}ms",
+                url,
+                stopwatch.ElapsedMilliseconds);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            _logger.LogError(
+                ex,
+                "GitLab API GET {Url} failed in {ElapsedMs}ms",
+                url,
+                stopwatch.ElapsedMilliseconds);
+            throw;
+        }
     }
 
     public async Task<IReadOnlyList<GitLabProjectDto>> GetProjectsAsync(CancellationToken cancellationToken = default)

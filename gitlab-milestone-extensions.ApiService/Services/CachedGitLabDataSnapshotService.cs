@@ -40,8 +40,12 @@ public sealed class CachedGitLabDataSnapshotService(
 
             var fetchStopwatch = Stopwatch.StartNew();
             var projects = await gitLabApiClient.GetProjectsAsync(cancellationToken);
-            var milestones = await gitLabApiClient.GetProjectMilestonesAsync(projects, cancellationToken);
-            var issues = await gitLabApiClient.GetProjectIssuesAsync(projects, cancellationToken);
+            var milestonesTask = gitLabApiClient.GetProjectMilestonesAsync(projects, cancellationToken);
+            var issuesTask = gitLabApiClient.GetProjectIssuesAsync(projects, cancellationToken);
+            await Task.WhenAll(milestonesTask, issuesTask);
+
+            var milestones = await milestonesTask;
+            var issues = await issuesTask;
             fetchStopwatch.Stop();
 
             var snapshot = new GitLabDataSnapshot(
