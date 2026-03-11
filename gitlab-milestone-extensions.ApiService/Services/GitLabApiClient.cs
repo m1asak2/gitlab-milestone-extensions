@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using gitlab_milestone_extensions.ApiService.Models;
 using gitlab_milestone_extensions.ApiService.Options;
@@ -56,9 +57,9 @@ public class GitLabApiClient
     public async Task<IReadOnlyList<GitLabProjectDto>> GetProjectsAsync(CancellationToken cancellationToken = default)
     {
         var stopwatch = Stopwatch.StartNew();
-        var projects = await GetAsync<List<GitLabProjectResponse>>(
-            $"groups/{_groupId}/projects?per_page=100",
-            cancellationToken) ?? [];
+        var projects = await GetPagedAsync<GitLabProjectResponse>(
+            $"groups/{_groupId}/projects",
+            cancellationToken);
         stopwatch.Stop();
         _logger.LogInformation(
             "GitLab projects fetched in {ElapsedMs}ms. Count={Count}",
@@ -84,9 +85,9 @@ public class GitLabApiClient
 
         var milestoneTasks = projects.Select(async project =>
         {
-            var milestones = await GetAsync<List<GitLabMilestoneResponse>>(
-                $"projects/{project.ProjectId}/milestones?per_page=100",
-                cancellationToken) ?? [];
+            var milestones = await GetPagedAsync<GitLabMilestoneResponse>(
+                $"projects/{project.ProjectId}/milestones",
+                cancellationToken);
 
             return milestones.Select(m => new GitLabMilestoneDto(
                 project.ProjectId,
@@ -124,9 +125,9 @@ public class GitLabApiClient
 
         var issueTasks = projects.Select(async project =>
         {
-            var issues = await GetAsync<List<GitLabIssueResponse>>(
-                $"projects/{project.ProjectId}/issues?per_page=100",
-                cancellationToken) ?? [];
+            var issues = await GetPagedAsync<GitLabIssueResponse>(
+                $"projects/{project.ProjectId}/issues",
+                cancellationToken);
 
             return issues.Select(i => new GitLabIssueDto(
                 project.ProjectId,
@@ -150,6 +151,53 @@ public class GitLabApiClient
             results.Count);
 
         return results;
+    }
+
+    private async Task<List<T>> GetPagedAsync<T>(string url, CancellationToken cancellationToken = default)
+    {
+        var allItems = new List<T>();
+        var page = 1;
+
+        while (true)
+        {
+            var separator = url.Contains('?') ? '&' : '?';
+            var pagedUrl = $"{url}{separator}per_page=100&page={page}";
+            var stopwatch = Stopwatch.StartNew();
+
+            using var response = await _httpClient.GetAsync(pagedUrl, cancellationToken);
+            response.EnsureSuccessStatusCode();
+
+            var pageItems = await response.Content.ReadFromJsonAsync<List<T>>(cancellationToken) ?? [];
+            stopwatch.Stop();
+
+            _logger.LogInformation(
+                "GitLab API GET {Url} page {Page} loaded in {ElapsedMs}ms. Count={Count}",
+                url,
+                page,
+                stopwatch.ElapsedMilliseconds,
+                pageItems.Count);
+
+            allItems.AddRange(pageItems);
+
+            var nextPageHeader = response.Headers.TryGetValues("X-Next-Page", out var values)
+                ? values.FirstOrDefault()
+                : null;
+
+            if (!string.IsNullOrWhiteSpace(nextPageHeader) && int.TryParse(nextPageHeader, out var nextPage))
+            {
+                page = nextPage;
+                continue;
+            }
+
+            if (pageItems.Count < 100)
+            {
+                break;
+            }
+
+            page++;
+        }
+
+        return allItems;
     }
 
     private sealed record GitLabProjectResponse(

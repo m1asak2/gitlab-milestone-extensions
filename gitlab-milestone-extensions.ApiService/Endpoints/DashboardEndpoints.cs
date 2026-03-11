@@ -29,13 +29,50 @@ public static class DashboardEndpoints
             .WithName("GetSummary")
             .WithOpenApi();
 
-        group.MapGet("/issues", async (IDashboardDataService service, ILoggerFactory loggerFactory, CancellationToken cancellationToken) =>
+        group.MapGet("/issues", async (
+            string? project,
+            string? milestone,
+            string? assignee,
+            string? state,
+            IDashboardDataService service,
+            ILoggerFactory loggerFactory,
+            CancellationToken cancellationToken) =>
         {
             var logger = loggerFactory.CreateLogger("DashboardEndpoints");
             var stopwatch = Stopwatch.StartNew();
-            var result = await service.GetIssuesAsync(cancellationToken);
+            var issues = await service.GetIssuesAsync(cancellationToken);
+            var filtered = issues.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(project))
+            {
+                filtered = filtered.Where(i => i.ProjectName.Equals(project, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (!string.IsNullOrWhiteSpace(milestone))
+            {
+                filtered = filtered.Where(i => i.MilestoneTitle.Equals(milestone, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (!string.IsNullOrWhiteSpace(assignee))
+            {
+                filtered = filtered.Where(i => i.AssigneeName.Equals(assignee, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (!string.IsNullOrWhiteSpace(state))
+            {
+                filtered = filtered.Where(i => i.State.Equals(state, StringComparison.OrdinalIgnoreCase));
+            }
+
+            var result = filtered.ToList();
             stopwatch.Stop();
-            logger.LogInformation("GET /api/issues completed in {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
+            logger.LogInformation(
+                "GET /api/issues completed in {ElapsedMs}ms. Filters: project={Project}, milestone={Milestone}, assignee={Assignee}, state={State}. Count={Count}",
+                stopwatch.ElapsedMilliseconds,
+                project ?? "(none)",
+                milestone ?? "(none)",
+                assignee ?? "(none)",
+                state ?? "(none)",
+                result.Count);
             return Results.Ok(result);
         })
             .WithName("GetIssues")
