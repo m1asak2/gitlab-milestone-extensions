@@ -32,7 +32,13 @@ public interface IDashboardDataService
     /// Gets gantt-like timeline rows.
     /// </summary>
     /// <param name="viewMode">Grouping mode.</param>
+    /// <param name="milestone">Milestone title filter.</param>
+    /// <param name="milestoneId">Milestone id filter.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Timeline list.</returns>
-    Task<IReadOnlyList<GanttItemDto>> GetGanttAsync(string? viewMode, CancellationToken cancellationToken);
+    Task<IReadOnlyList<GanttItemDto>> GetGanttAsync(
+        string? viewMode,
+        string? milestone,
+        int? milestoneId,
+        CancellationToken cancellationToken);
 }

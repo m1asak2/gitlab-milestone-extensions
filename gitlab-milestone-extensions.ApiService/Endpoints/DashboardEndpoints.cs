@@ -90,13 +90,25 @@ public static class DashboardEndpoints
             .WithName("GetMilestones")
             .WithOpenApi();
 
-        group.MapGet("/gantt", async (string? viewMode, IDashboardDataService service, ILoggerFactory loggerFactory, CancellationToken cancellationToken) =>
+        group.MapGet("/gantt", async (
+            string? viewMode,
+            string? milestone,
+            int? milestoneId,
+            IDashboardDataService service,
+            ILoggerFactory loggerFactory,
+            CancellationToken cancellationToken) =>
         {
             var logger = loggerFactory.CreateLogger("DashboardEndpoints");
             var stopwatch = Stopwatch.StartNew();
-            var result = await service.GetGanttAsync(viewMode, cancellationToken);
+            var result = await service.GetGanttAsync(viewMode, milestone, milestoneId, cancellationToken);
             stopwatch.Stop();
-            logger.LogInformation("GET /api/gantt completed in {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
+            logger.LogInformation(
+                "GET /api/gantt completed in {ElapsedMs}ms. Filters: viewMode={ViewMode}, milestone={Milestone}, milestoneId={MilestoneId}. Count={Count}",
+                stopwatch.ElapsedMilliseconds,
+                viewMode ?? "(none)",
+                milestone ?? "(none)",
+                milestoneId?.ToString() ?? "(none)",
+                result.Count);
             return Results.Ok(result);
         })
             .WithName("GetGantt")

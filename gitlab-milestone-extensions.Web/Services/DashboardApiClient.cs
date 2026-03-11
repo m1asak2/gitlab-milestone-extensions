@@ -13,9 +13,30 @@ public sealed class DashboardApiClient(HttpClient httpClient)
             ?? throw new InvalidOperationException("Failed to load /api/issues.");
         var milestones = await httpClient.GetFromJsonAsync<IReadOnlyList<MilestoneViewModel>>("api/milestones", cancellationToken)
             ?? throw new InvalidOperationException("Failed to load /api/milestones.");
-        var gantt = await httpClient.GetFromJsonAsync<IReadOnlyList<GanttItemViewModel>>("api/gantt", cancellationToken)
-            ?? throw new InvalidOperationException("Failed to load /api/gantt.");
+        var gantt = await GetGanttAsync(null, null, cancellationToken);
 
         return new DashboardViewModel(summary, issues, milestones, gantt);
+    }
+
+    public async Task<IReadOnlyList<GanttItemViewModel>> GetGanttAsync(
+        string? milestone,
+        int? milestoneId,
+        CancellationToken cancellationToken = default)
+    {
+        var query = new List<string>();
+        if (!string.IsNullOrWhiteSpace(milestone))
+        {
+            query.Add($"milestone={Uri.EscapeDataString(milestone)}");
+        }
+
+        if (milestoneId.HasValue)
+        {
+            query.Add($"milestoneId={milestoneId.Value}");
+        }
+
+        var url = query.Count == 0 ? "api/gantt" : $"api/gantt?{string.Join("&", query)}";
+
+        return await httpClient.GetFromJsonAsync<IReadOnlyList<GanttItemViewModel>>(url, cancellationToken)
+            ?? throw new InvalidOperationException($"Failed to load {url}.");
     }
 }

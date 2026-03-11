@@ -26,11 +26,16 @@ public sealed record SummaryDto(
 /// <param name="DueDate">Due date.</param>
 public sealed record DashboardIssue(
     string ProjectName,
+    int? MilestoneId,
     string MilestoneTitle,
     string Title,
     string State,
     string AssigneeName,
     DateOnly? DueDate,
+    int TimeEstimateSeconds,
+    int TotalTimeSpentSeconds,
+    string? HumanTimeEstimate,
+    string? HumanTotalTimeSpent,
     int Id = 0)
 {
     public string Assignee => AssigneeName;
@@ -49,11 +54,14 @@ public sealed record DashboardIssue(
 public sealed record DashboardMilestone(
     string ProjectName,
     string Title,
+    string Scope,
     string State,
     DateOnly? StartDate,
     DateOnly? DueDate,
     int OpenIssues,
     int ClosedIssues,
+    int TimeEstimateSeconds,
+    int TotalTimeSpentSeconds,
     int Id = 0)
 {
     public int Progress
@@ -83,4 +91,8 @@ public sealed record GanttItemDto(
     string Owner,
     DateOnly StartDate,
     DateOnly EndDate,
-    int Progress);
+    int Progress,
+    int? MilestoneId,
+    string? MilestoneTitle,
+    int TimeEstimateSeconds,
+    int TotalTimeSpentSeconds);

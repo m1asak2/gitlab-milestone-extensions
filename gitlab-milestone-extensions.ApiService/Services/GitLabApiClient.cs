@@ -94,6 +94,7 @@ public class GitLabApiClient
                 project.ProjectName,
                 m.Id,
                 m.Title,
+                "Project",
                 m.State,
                 m.StartDate,
                 m.DueDate));
@@ -106,6 +107,35 @@ public class GitLabApiClient
             "GitLab project milestones fetched in {ElapsedMs}ms. ProjectCount={ProjectCount}, MilestoneCount={MilestoneCount}",
             stopwatch.ElapsedMilliseconds,
             projects.Count,
+            results.Count);
+
+        return results;
+    }
+
+    public async Task<IReadOnlyList<GitLabMilestoneDto>> GetGroupMilestonesAsync(CancellationToken cancellationToken = default)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        var milestones = await GetPagedAsync<GitLabMilestoneResponse>(
+            $"groups/{_groupId}/milestones",
+            cancellationToken);
+
+        var results = milestones
+            .Select(m => new GitLabMilestoneDto(
+                ProjectId: _groupId,
+                ProjectName: "Group",
+                MilestoneId: m.Id,
+                Title: m.Title,
+                Scope: "Group",
+                State: m.State,
+                StartDate: m.StartDate,
+                DueDate: m.DueDate))
+            .ToList();
+
+        stopwatch.Stop();
+        _logger.LogInformation(
+            "GitLab group milestones fetched in {ElapsedMs}ms. GroupId={GroupId}, MilestoneCount={MilestoneCount}",
+            stopwatch.ElapsedMilliseconds,
+            _groupId,
             results.Count);
 
         return results;
@@ -136,9 +166,14 @@ public class GitLabApiClient
                 i.Iid,
                 i.Title,
                 i.State,
+                i.Milestone?.Id,
                 i.Milestone?.Title,
                 i.Assignee?.Name ?? i.Assignees?.FirstOrDefault()?.Name,
-                i.DueDate));
+                i.DueDate,
+                i.TimeStats?.TimeEstimate ?? 0,
+                i.TimeStats?.TotalTimeSpent ?? 0,
+                i.TimeStats?.HumanTimeEstimate,
+                i.TimeStats?.HumanTotalTimeSpent));
         });
 
         var resultByProject = await Task.WhenAll(issueTasks);
@@ -219,11 +254,19 @@ public class GitLabApiClient
         [property: JsonPropertyName("due_date")] DateOnly? DueDate,
         [property: JsonPropertyName("milestone")] GitLabIssueMilestoneResponse? Milestone,
         [property: JsonPropertyName("assignee")] GitLabIssueAssigneeResponse? Assignee,
-        [property: JsonPropertyName("assignees")] IReadOnlyList<GitLabIssueAssigneeResponse>? Assignees);
+        [property: JsonPropertyName("assignees")] IReadOnlyList<GitLabIssueAssigneeResponse>? Assignees,
+        [property: JsonPropertyName("time_stats")] GitLabIssueTimeStatsResponse? TimeStats);
 
     private sealed record GitLabIssueMilestoneResponse(
+        [property: JsonPropertyName("id")] int Id,
         [property: JsonPropertyName("title")] string Title);
 
     private sealed record GitLabIssueAssigneeResponse(
         [property: JsonPropertyName("name")] string Name);
+
+    private sealed record GitLabIssueTimeStatsResponse(
+        [property: JsonPropertyName("time_estimate")] int TimeEstimate,
+        [property: JsonPropertyName("total_time_spent")] int TotalTimeSpent,
+        [property: JsonPropertyName("human_time_estimate")] string? HumanTimeEstimate,
+        [property: JsonPropertyName("human_total_time_spent")] string? HumanTotalTimeSpent);
 }

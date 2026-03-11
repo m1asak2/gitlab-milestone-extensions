@@ -9,6 +9,7 @@ public sealed record GitLabMilestoneDto(
     string ProjectName,
     int MilestoneId,
     string Title,
+    string Scope,
     string State,
     DateOnly? StartDate,
     DateOnly? DueDate);
@@ -20,6 +21,11 @@ public sealed record GitLabIssueDto(
     int Iid,
     string Title,
     string State,
+    int? MilestoneId,
     string? MilestoneTitle,
     string? AssigneeName,
-    DateOnly? DueDate);
+    DateOnly? DueDate,
+    int TimeEstimateSeconds,
+    int TotalTimeSpentSeconds,
+    string? HumanTimeEstimate,
+    string? HumanTotalTimeSpent);
