@@ -39,12 +39,14 @@ public sealed class CachedGitLabDataSnapshotService(
             }
 
             var fetchStopwatch = Stopwatch.StartNew();
+            var groupTask = gitLabApiClient.GetGroupAsync(cancellationToken);
             var projects = await gitLabApiClient.GetProjectsAsync(cancellationToken);
             var projectMilestonesTask = gitLabApiClient.GetProjectMilestonesAsync(projects, cancellationToken);
             var groupMilestonesTask = gitLabApiClient.GetGroupMilestonesAsync(cancellationToken);
             var issuesTask = gitLabApiClient.GetProjectIssuesAsync(projects, cancellationToken);
-            await Task.WhenAll(projectMilestonesTask, groupMilestonesTask, issuesTask);
+            await Task.WhenAll(groupTask, projectMilestonesTask, groupMilestonesTask, issuesTask);
 
+            var groups = new[] { await groupTask };
             var projectMilestones = await projectMilestonesTask;
             var groupMilestones = await groupMilestonesTask;
             var milestones = projectMilestones
@@ -56,6 +58,7 @@ public sealed class CachedGitLabDataSnapshotService(
             fetchStopwatch.Stop();
 
             var snapshot = new GitLabDataSnapshot(
+                groups,
                 projects,
                 milestones,
                 issues,

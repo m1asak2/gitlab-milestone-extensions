@@ -1,6 +1,8 @@
 @page "/"
 @page "/dashboard"
+@implements IDisposable
 @inject DashboardApiClient ApiClient
+@inject MilestoneSelectionState SelectionState
 
 <PageTitle>Dashboard</PageTitle>
 
@@ -14,112 +16,80 @@ else if (!string.IsNullOrWhiteSpace(_errorMessage))
 {
     <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
 }
+else if (SelectionState.SelectedMilestoneId is null)
+{
+    <MudAlert Severity="Severity.Info">Milestone を選択してください。未選択時は Dashboard / Issues / Gantt のデータは表示されません。</MudAlert>
+}
 else
 {
-    <MudGrid Class="mb-4">
-        <MudItem xs="12" sm="6" lg="3">
-            <MudPaper Class="pa-4">
-                <MudText Typo="Typo.caption">Total Issues</MudText>
-                <MudText Typo="Typo.h5">@_summary?.TotalIssues</MudText>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="6" lg="3">
-            <MudPaper Class="pa-4">
-                <MudText Typo="Typo.caption">Open Issues</MudText>
-                <MudText Typo="Typo.h5">@_summary?.OpenIssues</MudText>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="6" lg="3">
-            <MudPaper Class="pa-4">
-                <MudText Typo="Typo.caption">Closed Issues</MudText>
-                <MudText Typo="Typo.h5">@_summary?.ClosedIssues</MudText>
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" sm="6" lg="3">
-            <MudPaper Class="pa-4">
-                <MudText Typo="Typo.caption">Overdue Issues</MudText>
-                <MudText Typo="Typo.h5">@_summary?.OverdueIssues</MudText>
-            </MudPaper>
-        </MudItem>
-    </MudGrid>
-
     <MudTabs>
-        <MudTabPanel Text="Issues">
-            <MudGrid Class="mb-3">
-                <MudItem xs="12" sm="6" md="3">
-                    <MudAutocomplete T="string"
-                                     Label="Project"
-                                     @bind-Value="_projectFilter"
-                                     SearchFunc="SearchProjectOptions"
-                                     MinCharacters="0"
-                                     OpenOnFocus="true"
-                                     Clearable="true"
-                                     ResetValueOnEmptyText="true"
-                                     CoerceText="false"
-                                     CoerceValue="false">
-                        <ItemTemplate Context="item">
-                            <span style="color:#1f2937">@item</span>
-                        </ItemTemplate>
-                    </MudAutocomplete>
+        <MudTabPanel Text="Dashboard">
+            <MudText Typo="Typo.subtitle1" Class="mb-2">
+                Milestone: @(_dashboard?.MilestoneTitle ?? "-")
+            </MudText>
+            <MudGrid Class="mb-4 mt-2">
+                <MudItem xs="12" sm="6" lg="3">
+                    <MudPaper Class="pa-4">
+                        <MudText Typo="Typo.caption">Total Issues</MudText>
+                        <MudText Typo="Typo.h5">@_dashboard?.TotalIssues</MudText>
+                    </MudPaper>
                 </MudItem>
-                <MudItem xs="12" sm="6" md="3">
-                    <MudAutocomplete T="string"
-                                     Label="Milestone"
-                                     @bind-Value="_milestoneFilter"
-                                     SearchFunc="SearchMilestoneOptions"
-                                     MinCharacters="0"
-                                     OpenOnFocus="true"
-                                     Clearable="true"
-                                     ResetValueOnEmptyText="true"
-                                     CoerceText="false"
-                                     CoerceValue="false">
-                        <ItemTemplate Context="item">
-                            <span style="color:#1f2937">@item</span>
-                        </ItemTemplate>
-                    </MudAutocomplete>
+                <MudItem xs="12" sm="6" lg="3">
+                    <MudPaper Class="pa-4">
+                        <MudText Typo="Typo.caption">Open Issues</MudText>
+                        <MudText Typo="Typo.h5">@_dashboard?.OpenIssues</MudText>
+                    </MudPaper>
                 </MudItem>
-                <MudItem xs="12" sm="6" md="3">
-                    <MudAutocomplete T="string"
-                                     Label="Assignee"
-                                     @bind-Value="_assigneeFilter"
-                                     SearchFunc="SearchAssigneeOptions"
-                                     MinCharacters="0"
-                                     OpenOnFocus="true"
-                                     Clearable="true"
-                                     ResetValueOnEmptyText="true"
-                                     CoerceText="false"
-                                     CoerceValue="false">
-                        <ItemTemplate Context="item">
-                            <span style="color:#1f2937">@item</span>
-                        </ItemTemplate>
-                    </MudAutocomplete>
+                <MudItem xs="12" sm="6" lg="3">
+                    <MudPaper Class="pa-4">
+                        <MudText Typo="Typo.caption">Closed Issues</MudText>
+                        <MudText Typo="Typo.h5">@_dashboard?.ClosedIssues</MudText>
+                    </MudPaper>
                 </MudItem>
-                <MudItem xs="12" sm="6" md="3">
-                    <MudAutocomplete T="string"
-                                     Label="State"
-                                     @bind-Value="_stateFilter"
-                                     SearchFunc="SearchStateOptions"
-                                     MinCharacters="0"
-                                     OpenOnFocus="true"
-                                     Clearable="true"
-                                     ResetValueOnEmptyText="true"
-                                     CoerceText="false"
-                                     CoerceValue="false">
-                        <ItemTemplate Context="item">
-                            <span style="color:#1f2937">@item</span>
-                        </ItemTemplate>
-                    </MudAutocomplete>
+                <MudItem xs="12" sm="6" lg="3">
+                    <MudPaper Class="pa-4">
+                        <MudText Typo="Typo.caption">Overdue Issues</MudText>
+                        <MudText Typo="Typo.h5">@_dashboard?.OverdueIssues</MudText>
+                    </MudPaper>
                 </MudItem>
             </MudGrid>
 
-            <MudTable Items="FilteredIssues">
+            <MudGrid>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Class="pa-4">
+                        <MudText Typo="Typo.caption">Start</MudText>
+                        <MudText Typo="Typo.h6">@(_dashboard?.StartDate?.ToString("yyyy-MM-dd") ?? "-")</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Class="pa-4">
+                        <MudText Typo="Typo.caption">Due</MudText>
+                        <MudText Typo="Typo.h6">@(_dashboard?.DueDate?.ToString("yyyy-MM-dd") ?? "-")</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Class="pa-4">
+                        <MudText Typo="Typo.caption">Estimate</MudText>
+                        <MudText Typo="Typo.h6">@FormatSeconds(_dashboard?.EstimateSeconds ?? 0)</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <MudPaper Class="pa-4">
+                        <MudText Typo="Typo.caption">Actual</MudText>
+                        <MudText Typo="Typo.h6">@FormatSeconds(_dashboard?.ActualSeconds ?? 0)</MudText>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+        </MudTabPanel>
+
+        <MudTabPanel Text="Issues">
+            <MudTable Items="_issues">
                 <HeaderContent>
                     <MudTh>Id</MudTh>
                     <MudTh>Title</MudTh>
                     <MudTh>Project</MudTh>
                     <MudTh>Assignee</MudTh>
                     <MudTh>State</MudTh>
-                    <MudTh>Milestone</MudTh>
                     <MudTh>Estimate</MudTh>
                     <MudTh>Actual</MudTh>
                 </HeaderContent>
@@ -129,55 +99,14 @@ else
                     <MudTd DataLabel="Project">@context.ProjectName</MudTd>
                     <MudTd DataLabel="Assignee">@context.Assignee</MudTd>
                     <MudTd DataLabel="State">@context.State</MudTd>
-                    <MudTd DataLabel="Milestone">@context.Milestone</MudTd>
                     <MudTd DataLabel="Estimate">@FormatIssueDuration(context.HumanTimeEstimate, context.TimeEstimateSeconds)</MudTd>
                     <MudTd DataLabel="Actual">@FormatIssueDuration(context.HumanTotalTimeSpent, context.TotalTimeSpentSeconds)</MudTd>
                 </RowTemplate>
             </MudTable>
         </MudTabPanel>
-        <MudTabPanel Text="Milestones">
-            <MudTable Items="_milestones">
-                <HeaderContent>
-                    <MudTh>Title</MudTh>
-                    <MudTh>Project</MudTh>
-                    <MudTh>Scope</MudTh>
-                    <MudTh>Start</MudTh>
-                    <MudTh>Due</MudTh>
-                    <MudTh>Estimate</MudTh>
-                    <MudTh>Actual</MudTh>
-                </HeaderContent>
-                <RowTemplate>
-                    <MudTd DataLabel="Title">@context.Title</MudTd>
-                    <MudTd DataLabel="Project">@context.ProjectName</MudTd>
-                    <MudTd DataLabel="Scope">@context.Scope</MudTd>
-                    <MudTd DataLabel="Start">@context.StartDate?.ToString("yyyy-MM-dd")</MudTd>
-                    <MudTd DataLabel="Due">@context.DueDate?.ToString("yyyy-MM-dd")</MudTd>
-                    <MudTd DataLabel="Estimate">@FormatSeconds(context.TimeEstimateSeconds)</MudTd>
-                    <MudTd DataLabel="Actual">@FormatSeconds(context.TotalTimeSpentSeconds)</MudTd>
-                </RowTemplate>
-            </MudTable>
-        </MudTabPanel>
-        <MudTabPanel Text="Gantt">
-            <MudGrid Class="mb-3">
-                <MudItem xs="12" sm="6" md="4">
-                    <MudAutocomplete T="string"
-                               Label="Milestone Filter"
-                               @bind-Value="_ganttMilestoneFilter"
-                               SearchFunc="SearchGanttMilestoneOptions"
-                               MinCharacters="0"
-                               OpenOnFocus="true"
-                               Clearable="true"
-                               ResetValueOnEmptyText="true"
-                               CoerceText="false"
-                               CoerceValue="false">
-                        <ItemTemplate Context="item">
-                            <span style="color:#1f2937">@item</span>
-                        </ItemTemplate>
-                    </MudAutocomplete>
-                </MudItem>
-            </MudGrid>
 
-            <MudTable Items="FilteredGanttItems">
+        <MudTabPanel Text="Gantt">
+            <MudTable Items="_ganttItems">
                 <HeaderContent>
                     <MudTh>Title</MudTh>
                     <MudTh>Mode</MudTh>
@@ -202,102 +131,64 @@ else
 }
 
 @code {
-    private bool _isLoading = true;
+    private bool _isLoading;
     private string? _errorMessage;
-    private SummaryViewModel? _summary;
+    private MilestoneDashboardViewModel? _dashboard;
     private IReadOnlyList<IssueViewModel> _issues = [];
-    private IReadOnlyList<MilestoneViewModel> _milestones = [];
     private IReadOnlyList<GanttItemViewModel> _ganttItems = [];
-    private string? _projectFilter;
-    private string? _milestoneFilter;
-    private string? _assigneeFilter;
-    private string? _stateFilter;
-    private string? _ganttMilestoneFilter;
-    private IReadOnlyList<string> ProjectFilterOptions { get; set; } = [];
-    private IReadOnlyList<string> MilestoneFilterOptions { get; set; } = [];
-    private IReadOnlyList<string> AssigneeFilterOptions { get; set; } = [];
-    private IReadOnlyList<string> StateFilterOptions { get; set; } = [];
-    private IReadOnlyList<string> GanttMilestoneFilterOptions { get; set; } = [];
-
-    private IReadOnlyList<IssueViewModel> FilteredIssues =>
-        _issues.Where(i =>
-                (string.IsNullOrWhiteSpace(_projectFilter) || i.ProjectName.Equals(_projectFilter, StringComparison.OrdinalIgnoreCase)) &&
-                (string.IsNullOrWhiteSpace(_milestoneFilter) || i.Milestone.Equals(_milestoneFilter, StringComparison.OrdinalIgnoreCase)) &&
-                (string.IsNullOrWhiteSpace(_assigneeFilter) || i.Assignee.Equals(_assigneeFilter, StringComparison.OrdinalIgnoreCase)) &&
-                (string.IsNullOrWhiteSpace(_stateFilter) || i.State.Equals(_stateFilter, StringComparison.OrdinalIgnoreCase)))
-            .ToList();
-
-    private IReadOnlyList<GanttItemViewModel> FilteredGanttItems =>
-        _ganttItems.Where(i =>
-                string.IsNullOrWhiteSpace(_ganttMilestoneFilter) ||
-                (!string.IsNullOrWhiteSpace(i.MilestoneTitle) &&
-                 i.MilestoneTitle.Equals(_ganttMilestoneFilter, StringComparison.OrdinalIgnoreCase)))
-            .ToList();
 
     protected override async Task OnInitializedAsync()
     {
+        SelectionState.Changed += OnSelectionChanged;
+        await LoadMilestoneDataAsync();
+    }
+
+    public void Dispose()
+    {
+        SelectionState.Changed -= OnSelectionChanged;
+    }
+
+    private async void OnSelectionChanged()
+    {
+        await InvokeAsync(LoadMilestoneDataAsync);
+    }
+
+    private async Task LoadMilestoneDataAsync()
+    {
+        _errorMessage = null;
+
+        var milestoneId = SelectionState.SelectedMilestoneId;
+        if (!milestoneId.HasValue)
+        {
+            _dashboard = null;
+            _issues = [];
+            _ganttItems = [];
+            _isLoading = false;
+            StateHasChanged();
+            return;
+        }
+
+        _isLoading = true;
+        StateHasChanged();
+
         try
         {
-            var dashboardData = await ApiClient.GetDashboardDataAsync();
-            _summary = dashboardData.Summary;
-            _issues = dashboardData.Issues;
-            _milestones = dashboardData.Milestones;
-            _ganttItems = dashboardData.GanttItems;
-            BuildFilterOptions();
+            _dashboard = await ApiClient.GetDashboardAsync(milestoneId.Value);
+            _issues = await ApiClient.GetIssuesAsync(milestoneId.Value);
+            _ganttItems = await ApiClient.GetGanttAsync(milestoneId.Value);
         }
         catch (Exception ex)
         {
             _errorMessage = ex.Message;
+            _dashboard = null;
+            _issues = [];
+            _ganttItems = [];
         }
         finally
         {
             _isLoading = false;
+            StateHasChanged();
         }
-    }
-
-    private void BuildFilterOptions()
-    {
-        ProjectFilterOptions = BuildOptions(_issues.Select(i => i.ProjectName));
-        MilestoneFilterOptions = BuildOptions(_issues.Select(i => i.Milestone));
-        AssigneeFilterOptions = BuildOptions(_issues.Select(i => i.Assignee));
-        StateFilterOptions = BuildOptions(_issues.Select(i => i.State));
-        GanttMilestoneFilterOptions = BuildOptions(_ganttItems
-            .Select(i => i.MilestoneTitle ?? string.Empty));
-    }
-
-    private static IReadOnlyList<string> BuildOptions(IEnumerable<string> values)
-    {
-        return values
-            .Where(v => !string.IsNullOrWhiteSpace(v))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(v => v)
-            .ToList();
-    }
-
-    private Task<IEnumerable<string>> SearchProjectOptions(string? value, CancellationToken cancellationToken) =>
-        SearchOptions(ProjectFilterOptions, value);
-
-    private Task<IEnumerable<string>> SearchMilestoneOptions(string? value, CancellationToken cancellationToken) =>
-        SearchOptions(MilestoneFilterOptions, value);
-
-    private Task<IEnumerable<string>> SearchAssigneeOptions(string? value, CancellationToken cancellationToken) =>
-        SearchOptions(AssigneeFilterOptions, value);
-
-    private Task<IEnumerable<string>> SearchStateOptions(string? value, CancellationToken cancellationToken) =>
-        SearchOptions(StateFilterOptions, value);
-
-    private Task<IEnumerable<string>> SearchGanttMilestoneOptions(string? value, CancellationToken cancellationToken) =>
-        SearchOptions(GanttMilestoneFilterOptions, value);
-
-    private static Task<IEnumerable<string>> SearchOptions(IEnumerable<string> source, string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return Task.FromResult(source);
-        }
-
-        var results = source.Where(x => x.Contains(value, StringComparison.OrdinalIgnoreCase));
-        return Task.FromResult(results);
     }
 
     private static string FormatIssueDuration(string? humanReadable, int seconds)

@@ -1,17 +1,235 @@
 @inherits LayoutComponentBase
+@implements IDisposable
+@inject DashboardApiClient ApiClient
+@inject MilestoneSelectionState SelectionState
 
 <MudLayout>
     <MudAppBar Elevation="1">
         <MudText Typo="Typo.h6">GitLab Milestone Dashboard</MudText>
         <MudSpacer />
-        <MudButton Variant="Variant.Outlined" Color="Color.Inherit" StartIcon="@Icons.Material.Filled.Refresh" Href="/">
+        <MudButton Variant="Variant.Outlined" Color="Color.Inherit" StartIcon="@Icons.Material.Filled.Refresh" Href="/dashboard">
             Refresh
         </MudButton>
     </MudAppBar>
 
     <MudMainContent>
         <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-6 pb-8">
+            <MudPaper Class="pa-4 mb-4">
+                <MudGrid>
+                    <MudItem xs="12" sm="6" md="3">
+                        <label class="selector-label" for="group-select">Group</label>
+                        <select id="group-select"
+                                class="selector-input"
+                                value="@(_selectedGroupId?.ToString() ?? string.Empty)"
+                                @onchange="OnGroupChanged"
+                                disabled="@_isLoadingSelectors">
+                            <option value="">Select Group</option>
+                            @foreach (var group in _groups)
+                            {
+                                <option value="@group.GroupId">@group.GroupName</option>
+                            }
+                        </select>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <label class="selector-label" for="member-select">Member</label>
+                        <select id="member-select"
+                                class="selector-input"
+                                value="@(_selectedMemberId?.ToString() ?? string.Empty)"
+                                @onchange="OnMemberChanged"
+                                disabled="@_isLoadingSelectors">
+                            <option value="">Select Member</option>
+                            @foreach (var member in _members)
+                            {
+                                <option value="@member.MemberId">@member.MemberName</option>
+                            }
+                        </select>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <label class="selector-label" for="project-select">Project</label>
+                        <select id="project-select"
+                                class="selector-input"
+                                value="@(_selectedProjectId?.ToString() ?? string.Empty)"
+                                @onchange="OnProjectChanged"
+                                disabled="@_isLoadingSelectors">
+                            <option value="">Select Project</option>
+                            @foreach (var project in _projects)
+                            {
+                                <option value="@project.ProjectId">@project.ProjectName</option>
+                            }
+                        </select>
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <label class="selector-label" for="milestone-select">Milestone</label>
+                        <select id="milestone-select"
+                                class="selector-input"
+                                value="@(_selectedMilestoneId?.ToString() ?? string.Empty)"
+                                @onchange="OnMilestoneChanged"
+                                disabled="@_isLoadingSelectors">
+                            <option value="">Select Milestone</option>
+                            @foreach (var milestone in _milestones)
+                            {
+                                <option value="@milestone.MilestoneId">@milestone.MilestoneTitle</option>
+                            }
+                        </select>
+                    </MudItem>
+                </MudGrid>
+
+                @if (!string.IsNullOrWhiteSpace(_selectorError))
+                {
+                    <MudAlert Class="mt-3" Severity="Severity.Error">@_selectorError</MudAlert>
+                }
+            </MudPaper>
+
             @Body
         </MudContainer>
     </MudMainContent>
 </MudLayout>
+
+@code {
+    private bool _isLoadingSelectors;
+    private string? _selectorError;
+
+    private int? _selectedGroupId;
+    private int? _selectedMemberId;
+    private int? _selectedProjectId;
+    private int? _selectedMilestoneId;
+
+    private IReadOnlyList<SelectionGroupViewModel> _groups = [];
+    private IReadOnlyList<SelectionMemberViewModel> _members = [];
+    private IReadOnlyList<SelectionProjectViewModel> _projects = [];
+    private IReadOnlyList<SelectionMilestoneViewModel> _milestones = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        SelectionState.Changed += OnSelectionStateChanged;
+        await LoadSelectionOptionsAsync();
+    }
+
+    public void Dispose()
+    {
+        SelectionState.Changed -= OnSelectionStateChanged;
+    }
+
+    private async Task OnGroupChanged(ChangeEventArgs args)
+    {
+        var value = ParseNullableInt(args);
+        _selectedGroupId = value;
+        SelectionState.SetGroup(value);
+        await LoadSelectionOptionsAsync();
+    }
+
+    private async Task OnMemberChanged(ChangeEventArgs args)
+    {
+        var value = ParseNullableInt(args);
+        _selectedMemberId = value;
+        SelectionState.SetMember(value);
+        await LoadSelectionOptionsAsync();
+    }
+
+    private async Task OnProjectChanged(ChangeEventArgs args)
+    {
+        var value = ParseNullableInt(args);
+        _selectedProjectId = value;
+        SelectionState.SetProject(value);
+        await LoadSelectionOptionsAsync();
+    }
+
+    private Task OnMilestoneChanged(ChangeEventArgs args)
+    {
+        var value = ParseNullableInt(args);
+        _selectedMilestoneId = value;
+        SelectionState.SetMilestone(value);
+        return LoadSelectionOptionsAsync();
+    }
+
+    private void OnSelectionStateChanged()
+    {
+        _selectedGroupId = SelectionState.SelectedGroupId;
+        _selectedMemberId = SelectionState.SelectedMemberId;
+        _selectedProjectId = SelectionState.SelectedProjectId;
+        _selectedMilestoneId = SelectionState.SelectedMilestoneId;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task LoadSelectionOptionsAsync()
+    {
+        _isLoadingSelectors = true;
+        _selectorError = null;
+
+        try
+        {
+            var options = await ApiClient.GetSelectionOptionsAsync(
+                SelectionState.SelectedGroupId,
+                SelectionState.SelectedMemberId,
+                SelectionState.SelectedProjectId,
+                SelectionState.SelectedMilestoneId);
+
+            _groups = options.Groups;
+            _members = options.Members;
+            _projects = options.Projects;
+            _milestones = options.Milestones;
+
+            var selectionAdjusted = false;
+            if (_selectedGroupId.HasValue && !_groups.Any(x => x.GroupId == _selectedGroupId.Value))
+            {
+                _selectedGroupId = null;
+                SelectionState.SetGroup(null);
+                selectionAdjusted = true;
+            }
+
+            if (_selectedMemberId.HasValue && !_members.Any(x => x.MemberId == _selectedMemberId.Value))
+            {
+                _selectedMemberId = null;
+                SelectionState.SetMember(null);
+                selectionAdjusted = true;
+            }
+
+            if (_selectedProjectId.HasValue && !_projects.Any(x => x.ProjectId == _selectedProjectId.Value))
+            {
+                _selectedProjectId = null;
+                SelectionState.SetProject(null);
+                selectionAdjusted = true;
+            }
+
+            if (_selectedMilestoneId.HasValue && !_milestones.Any(x => x.MilestoneId == _selectedMilestoneId.Value))
+            {
+                _selectedMilestoneId = null;
+                SelectionState.SetMilestone(null);
+                selectionAdjusted = true;
+            }
+
+            if (selectionAdjusted)
+            {
+                options = await ApiClient.GetSelectionOptionsAsync(
+                    SelectionState.SelectedGroupId,
+                    SelectionState.SelectedMemberId,
+                    SelectionState.SelectedProjectId,
+                    SelectionState.SelectedMilestoneId);
+
+                _groups = options.Groups;
+                _members = options.Members;
+                _projects = options.Projects;
+                _milestones = options.Milestones;
+            }
+
+            _selectedGroupId = SelectionState.SelectedGroupId;
+            _selectedMemberId = SelectionState.SelectedMemberId;
+            _selectedProjectId = SelectionState.SelectedProjectId;
+            _selectedMilestoneId = SelectionState.SelectedMilestoneId;
+        }
+        catch (Exception ex)
+        {
+            _selectorError = ex.Message;
+        }
+        finally
+        {
+            _isLoadingSelectors = false;
+        }
+    }
+
+    private static int? ParseNullableInt(ChangeEventArgs args)
+    {
+        var raw = args.Value?.ToString();
+        return int.TryParse(raw, out var value) ? value : null;
+    }
+}

@@ -71,6 +71,21 @@ public class GitLabApiClient
             .ToList();
     }
 
+    public async Task<GitLabGroupDto> GetGroupAsync(CancellationToken cancellationToken = default)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        var group = await GetAsync<GitLabGroupResponse>($"groups/{_groupId}", cancellationToken)
+            ?? throw new InvalidOperationException($"GitLab group '{_groupId}' was not found.");
+        stopwatch.Stop();
+
+        _logger.LogInformation(
+            "GitLab group fetched in {ElapsedMs}ms. GroupId={GroupId}",
+            stopwatch.ElapsedMilliseconds,
+            _groupId);
+
+        return new GitLabGroupDto(group.Id, group.Name);
+    }
+
     public async Task<IReadOnlyList<GitLabMilestoneDto>> GetProjectMilestonesAsync(CancellationToken cancellationToken = default)
     {
         var projects = await GetProjectsAsync(cancellationToken);
@@ -168,6 +183,7 @@ public class GitLabApiClient
                 i.State,
                 i.Milestone?.Id,
                 i.Milestone?.Title,
+                i.Assignee?.Id ?? i.Assignees?.FirstOrDefault()?.Id,
                 i.Assignee?.Name ?? i.Assignees?.FirstOrDefault()?.Name,
                 i.DueDate,
                 i.TimeStats?.TimeEstimate ?? 0,
@@ -239,6 +255,10 @@ public class GitLabApiClient
         [property: JsonPropertyName("id")] int Id,
         [property: JsonPropertyName("name")] string Name);
 
+    private sealed record GitLabGroupResponse(
+        [property: JsonPropertyName("id")] int Id,
+        [property: JsonPropertyName("name")] string Name);
+
     private sealed record GitLabMilestoneResponse(
         [property: JsonPropertyName("id")] int Id,
         [property: JsonPropertyName("title")] string Title,
@@ -262,6 +282,7 @@ public class GitLabApiClient
         [property: JsonPropertyName("title")] string Title);
 
     private sealed record GitLabIssueAssigneeResponse(
+        [property: JsonPropertyName("id")] int Id,
         [property: JsonPropertyName("name")] string Name);
 
     private sealed record GitLabIssueTimeStatsResponse(

@@ -7,78 +7,149 @@ namespace gitlab_milestone_extensions.ApiService.Services;
 /// </summary>
 public sealed class GitLabDashboardDataService(IGitLabDataSnapshotService snapshotService) : IDashboardDataService
 {
-    public async Task<SummaryDto> GetSummaryAsync(CancellationToken cancellationToken)
-    {
-        var snapshot = await snapshotService.GetSnapshotAsync(cancellationToken);
-        var issues = BuildDashboardIssues(snapshot.Issues);
-        var milestones = BuildDashboardMilestones(snapshot.Milestones, issues);
-
-        var openIssues = issues.Count(i => i.State.Equals("opened", StringComparison.OrdinalIgnoreCase));
-        var closedIssues = issues.Count(i => i.State.Equals("closed", StringComparison.OrdinalIgnoreCase));
-        var overdueIssues = issues.Count(i =>
-            i.State.Equals("opened", StringComparison.OrdinalIgnoreCase) &&
-            i.DueDate.HasValue &&
-            i.DueDate.Value < DateOnly.FromDateTime(DateTime.Today));
-
-        return new SummaryDto(
-            TotalIssues: issues.Count,
-            OpenIssues: openIssues,
-            ClosedIssues: closedIssues,
-            OverdueIssues: overdueIssues,
-            TotalMilestones: milestones.Count);
-    }
-
-    public async Task<IReadOnlyList<DashboardIssue>> GetIssuesAsync(CancellationToken cancellationToken)
-    {
-        var snapshot = await snapshotService.GetSnapshotAsync(cancellationToken);
-        return BuildDashboardIssues(snapshot.Issues);
-    }
-
-    public async Task<IReadOnlyList<DashboardMilestone>> GetMilestonesAsync(CancellationToken cancellationToken)
-    {
-        var snapshot = await snapshotService.GetSnapshotAsync(cancellationToken);
-        var issues = BuildDashboardIssues(snapshot.Issues);
-        return BuildDashboardMilestones(snapshot.Milestones, issues);
-    }
-
-    public async Task<IReadOnlyList<GanttItemDto>> GetGanttAsync(
-        string? viewMode,
-        string? milestone,
+    public async Task<SelectionOptionsDto> GetSelectionOptionsAsync(
+        int? groupId,
+        int? memberId,
+        int? projectId,
         int? milestoneId,
         CancellationToken cancellationToken)
     {
-        var mode = string.IsNullOrWhiteSpace(viewMode) ? "project" : viewMode.Trim().ToLowerInvariant();
         var snapshot = await snapshotService.GetSnapshotAsync(cancellationToken);
+        var groups = snapshot.Groups
+            .Select(g => new SelectorGroupDto(g.GroupId, g.GroupName))
+            .OrderBy(g => g.GroupName)
+            .ToList();
         var issues = BuildDashboardIssues(snapshot.Issues);
+        var hasValidGroup = !groupId.HasValue || groups.Any(g => g.GroupId == groupId.Value);
+        if (!hasValidGroup)
+        {
+            return new SelectionOptionsDto(groups, [], [], []);
+        }
+
+        IEnumerable<DashboardIssue> FilterIssues(
+            int? selectedMemberId,
+            int? selectedProjectId,
+            int? selectedMilestoneId)
+        {
+            var scoped = issues.AsEnumerable();
+            if (selectedMemberId.HasValue)
+            {
+                scoped = scoped.Where(i => i.AssigneeId == selectedMemberId.Value);
+            }
+
+            if (selectedProjectId.HasValue)
+            {
+                scoped = scoped.Where(i => i.ProjectId == selectedProjectId.Value);
+            }
+
+            if (selectedMilestoneId.HasValue)
+            {
+                scoped = scoped.Where(i => i.MilestoneId == selectedMilestoneId.Value);
+            }
+
+            return scoped;
+        }
+
+        var memberSource = FilterIssues(null, projectId, milestoneId)
+            .Where(i => i.AssigneeId.HasValue);
+        var members = memberSource
+            .GroupBy(i => i.AssigneeId!.Value)
+            .Select(g => new SelectorMemberDto(
+                g.Key,
+                g.Select(i => i.AssigneeName).FirstOrDefault(name => !string.IsNullOrWhiteSpace(name)) ?? $"Member {g.Key}"))
+            .OrderBy(m => m.MemberName)
+            .ToList();
+
+        var projectIds = FilterIssues(memberId, null, milestoneId)
+            .Select(i => i.ProjectId)
+            .Distinct()
+            .ToHashSet();
+        var projects = snapshot.Projects
+            .Where(p => projectIds.Contains(p.ProjectId))
+            .Select(p => new SelectorProjectDto(p.ProjectId, p.ProjectName))
+            .OrderBy(p => p.ProjectName)
+            .ToList();
+
+        var milestoneIds = FilterIssues(memberId, projectId, null)
+            .Where(i => i.MilestoneId.HasValue)
+            .Select(i => i.MilestoneId!.Value)
+            .Distinct()
+            .ToHashSet();
+        var milestones = snapshot.Milestones
+            .Where(m => milestoneIds.Contains(m.MilestoneId))
+            .GroupBy(m => m.MilestoneId)
+            .Select(g => g.First())
+            .Select(m => new SelectorMilestoneDto(
+                m.MilestoneId,
+                m.Title,
+                m.ProjectId,
+                m.ProjectName,
+                m.StartDate,
+                m.DueDate))
+            .OrderBy(m => m.MilestoneTitle)
+            .ToList();
+
+        return new SelectionOptionsDto(groups, members, projects, milestones);
+    }
+
+    public async Task<MilestoneDashboardDto?> GetDashboardAsync(int milestoneId, CancellationToken cancellationToken)
+    {
+        var snapshot = await snapshotService.GetSnapshotAsync(cancellationToken);
+        var issues = BuildDashboardIssues(snapshot.Issues)
+            .Where(i => i.MilestoneId == milestoneId)
+            .ToList();
+
+        if (issues.Count == 0)
+        {
+            return null;
+        }
+
+        var milestone = snapshot.Milestones.FirstOrDefault(m => m.MilestoneId == milestoneId);
         var today = DateOnly.FromDateTime(DateTime.Today);
 
-        if (!string.IsNullOrWhiteSpace(milestone))
-        {
-            issues = issues
-                .Where(i => i.MilestoneTitle.Equals(milestone, StringComparison.OrdinalIgnoreCase))
-                .ToList();
-        }
+        return new MilestoneDashboardDto(
+            MilestoneId: milestoneId,
+            MilestoneTitle: milestone?.Title ?? issues[0].MilestoneTitle,
+            TotalIssues: issues.Count,
+            OpenIssues: issues.Count(i => i.State.Equals("opened", StringComparison.OrdinalIgnoreCase)),
+            ClosedIssues: issues.Count(i => i.State.Equals("closed", StringComparison.OrdinalIgnoreCase)),
+            OverdueIssues: issues.Count(i =>
+                i.State.Equals("opened", StringComparison.OrdinalIgnoreCase) &&
+                i.DueDate.HasValue &&
+                i.DueDate.Value < today),
+            StartDate: milestone?.StartDate,
+            DueDate: milestone?.DueDate,
+            EstimateSeconds: issues.Sum(i => i.TimeEstimateSeconds),
+            ActualSeconds: issues.Sum(i => i.TotalTimeSpentSeconds));
+    }
 
-        if (milestoneId.HasValue)
-        {
-            issues = issues
-                .Where(i => i.MilestoneId == milestoneId.Value)
-                .ToList();
-        }
+    public async Task<IReadOnlyList<DashboardIssue>> GetIssuesAsync(int milestoneId, CancellationToken cancellationToken)
+    {
+        var snapshot = await snapshotService.GetSnapshotAsync(cancellationToken);
+        return BuildDashboardIssues(snapshot.Issues)
+            .Where(i => i.MilestoneId == milestoneId)
+            .ToList();
+    }
 
-        var items = issues
+    public async Task<IReadOnlyList<GanttItemDto>> GetGanttAsync(int milestoneId, CancellationToken cancellationToken)
+    {
+        var snapshot = await snapshotService.GetSnapshotAsync(cancellationToken);
+        var milestone = snapshot.Milestones.FirstOrDefault(m => m.MilestoneId == milestoneId);
+        var today = DateOnly.FromDateTime(DateTime.Today);
+
+        return BuildDashboardIssues(snapshot.Issues)
+            .Where(i => i.MilestoneId == milestoneId)
             .Select((issue, index) =>
             {
-                var endDate = issue.DueDate ?? today;
-                var startDate = issue.DueDate?.AddDays(-7) ?? today;
-                var milestoneTitle = string.IsNullOrWhiteSpace(issue.MilestoneTitle) ? "(No milestone)" : issue.MilestoneTitle;
+                var endDate = issue.DueDate ?? milestone?.DueDate ?? today;
+                var startDate = milestone?.StartDate ?? endDate.AddDays(-7);
                 var progress = issue.State.Equals("closed", StringComparison.OrdinalIgnoreCase) ? 100 : 0;
 
                 return new GanttItemDto(
                     Id: issue.Id == 0 ? index + 1 : issue.Id,
-                    Title: $"{milestoneTitle} | {issue.Title}",
-                    ViewMode: mode,
-                    Owner: issue.ProjectName,
+                    Title: issue.Title,
+                    ViewMode: "milestone",
+                    Owner: issue.AssigneeName,
                     StartDate: startDate,
                     EndDate: endDate,
                     Progress: progress,
@@ -88,8 +159,6 @@ public sealed class GitLabDashboardDataService(IGitLabDataSnapshotService snapsh
                     TotalTimeSpentSeconds: issue.TotalTimeSpentSeconds);
             })
             .ToList();
-
-        return items;
     }
 
     private static List<DashboardIssue> BuildDashboardIssues(IReadOnlyList<GitLabIssueDto> gitLabIssues)
@@ -97,10 +166,12 @@ public sealed class GitLabDashboardDataService(IGitLabDataSnapshotService snapsh
         return gitLabIssues
             .Select(i => new DashboardIssue(
                 ProjectName: i.ProjectName,
+                ProjectId: i.ProjectId,
                 MilestoneId: i.MilestoneId,
                 MilestoneTitle: i.MilestoneTitle ?? string.Empty,
                 Title: i.Title,
                 State: i.State,
+                AssigneeId: i.AssigneeId,
                 AssigneeName: i.AssigneeName ?? string.Empty,
                 DueDate: i.DueDate,
                 TimeEstimateSeconds: i.TimeEstimateSeconds,
@@ -109,46 +180,6 @@ public sealed class GitLabDashboardDataService(IGitLabDataSnapshotService snapsh
                 HumanTotalTimeSpent: CoalesceHumanReadableDuration(i.HumanTotalTimeSpent, i.TotalTimeSpentSeconds),
                 Id: i.Iid))
             .ToList();
-    }
-
-    private static IReadOnlyList<DashboardMilestone> BuildDashboardMilestones(
-        IReadOnlyList<GitLabMilestoneDto> gitLabMilestones,
-        IReadOnlyList<DashboardIssue> dashboardIssues)
-    {
-        var issueStatsByMilestoneId = dashboardIssues
-            .Where(i => i.MilestoneId.HasValue)
-            .GroupBy(i => i.MilestoneId!.Value)
-            .ToDictionary(
-                g => g.Key,
-                g => new
-                {
-                    OpenIssues = g.Count(i => i.State.Equals("opened", StringComparison.OrdinalIgnoreCase)),
-                    ClosedIssues = g.Count(i => i.State.Equals("closed", StringComparison.OrdinalIgnoreCase)),
-                    TimeEstimateSeconds = g.Sum(i => i.TimeEstimateSeconds),
-                    TotalTimeSpentSeconds = g.Sum(i => i.TotalTimeSpentSeconds)
-                });
-
-        var milestones = gitLabMilestones
-            .Select(m =>
-            {
-                var counts = issueStatsByMilestoneId.GetValueOrDefault(m.MilestoneId);
-
-                return new DashboardMilestone(
-                    ProjectName: m.ProjectName,
-                    Title: m.Title,
-                    Scope: m.Scope,
-                    State: m.State,
-                    StartDate: m.StartDate,
-                    DueDate: m.DueDate,
-                    OpenIssues: counts?.OpenIssues ?? 0,
-                    ClosedIssues: counts?.ClosedIssues ?? 0,
-                    TimeEstimateSeconds: counts?.TimeEstimateSeconds ?? 0,
-                    TotalTimeSpentSeconds: counts?.TotalTimeSpentSeconds ?? 0,
-                    Id: m.MilestoneId);
-            })
-            .ToList();
-
-        return milestones;
     }
 
     private static string CoalesceHumanReadableDuration(string? humanDuration, int seconds)

@@ -4,6 +4,10 @@ public sealed record GitLabProjectDto(
     int ProjectId,
     string ProjectName);
 
+public sealed record GitLabGroupDto(
+    int GroupId,
+    string GroupName);
+
 public sealed record GitLabMilestoneDto(
     int ProjectId,
     string ProjectName,
@@ -23,6 +27,7 @@ public sealed record GitLabIssueDto(
     string State,
     int? MilestoneId,
     string? MilestoneTitle,
+    int? AssigneeId,
     string? AssigneeName,
     DateOnly? DueDate,
     int TimeEstimateSeconds,

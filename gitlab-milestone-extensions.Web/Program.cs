@@ -20,5 +20,6 @@ builder.Services.AddScoped(sp =>
     return new HttpClient { BaseAddress = baseAddress };
 });
 builder.Services.AddScoped<DashboardApiClient>();
+builder.Services.AddScoped<MilestoneSelectionState>();
 
 await builder.Build().RunAsync();

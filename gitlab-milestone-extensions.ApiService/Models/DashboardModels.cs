@@ -11,8 +11,48 @@ public sealed record SummaryDto(
     int TotalIssues,
     int OpenIssues,
     int ClosedIssues,
+    int OverdueIssues);
+
+/// <summary>
+/// Milestone-focused dashboard summary.
+/// </summary>
+public sealed record MilestoneDashboardDto(
+    int MilestoneId,
+    string MilestoneTitle,
+    int TotalIssues,
+    int OpenIssues,
+    int ClosedIssues,
     int OverdueIssues,
-    int TotalMilestones = 0);
+    DateOnly? StartDate,
+    DateOnly? DueDate,
+    int EstimateSeconds,
+    int ActualSeconds);
+
+public sealed record SelectorGroupDto(
+    int GroupId,
+    string GroupName);
+
+public sealed record SelectorMemberDto(
+    int MemberId,
+    string MemberName);
+
+public sealed record SelectorProjectDto(
+    int ProjectId,
+    string ProjectName);
+
+public sealed record SelectorMilestoneDto(
+    int MilestoneId,
+    string MilestoneTitle,
+    int ProjectId,
+    string ProjectName,
+    DateOnly? StartDate,
+    DateOnly? DueDate);
+
+public sealed record SelectionOptionsDto(
+    IReadOnlyList<SelectorGroupDto> Groups,
+    IReadOnlyList<SelectorMemberDto> Members,
+    IReadOnlyList<SelectorProjectDto> Projects,
+    IReadOnlyList<SelectorMilestoneDto> Milestones);
 
 /// <summary>
 /// Issue row used by the issues table.
@@ -26,10 +66,12 @@ public sealed record SummaryDto(
 /// <param name="DueDate">Due date.</param>
 public sealed record DashboardIssue(
     string ProjectName,
+    int ProjectId,
     int? MilestoneId,
     string MilestoneTitle,
     string Title,
     string State,
+    int? AssigneeId,
     string AssigneeName,
     DateOnly? DueDate,
     int TimeEstimateSeconds,

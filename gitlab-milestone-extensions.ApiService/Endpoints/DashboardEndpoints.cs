@@ -1,3 +1,4 @@
+using gitlab_milestone_extensions.ApiService.Models;
 using gitlab_milestone_extensions.ApiService.Services;
 using System.Diagnostics;
 
@@ -17,82 +18,10 @@ public static class DashboardEndpoints
     {
         var group = app.MapGroup("/api");
 
-        group.MapGet("/summary", async (IDashboardDataService service, ILoggerFactory loggerFactory, CancellationToken cancellationToken) =>
-        {
-            var logger = loggerFactory.CreateLogger("DashboardEndpoints");
-            var stopwatch = Stopwatch.StartNew();
-            var result = await service.GetSummaryAsync(cancellationToken);
-            stopwatch.Stop();
-            logger.LogInformation("GET /api/summary completed in {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
-            return Results.Ok(result);
-        })
-            .WithName("GetSummary")
-            .WithOpenApi();
-
-        group.MapGet("/issues", async (
-            string? project,
-            string? milestone,
-            string? assignee,
-            string? state,
-            IDashboardDataService service,
-            ILoggerFactory loggerFactory,
-            CancellationToken cancellationToken) =>
-        {
-            var logger = loggerFactory.CreateLogger("DashboardEndpoints");
-            var stopwatch = Stopwatch.StartNew();
-            var issues = await service.GetIssuesAsync(cancellationToken);
-            var filtered = issues.AsEnumerable();
-
-            if (!string.IsNullOrWhiteSpace(project))
-            {
-                filtered = filtered.Where(i => i.ProjectName.Equals(project, StringComparison.OrdinalIgnoreCase));
-            }
-
-            if (!string.IsNullOrWhiteSpace(milestone))
-            {
-                filtered = filtered.Where(i => i.MilestoneTitle.Equals(milestone, StringComparison.OrdinalIgnoreCase));
-            }
-
-            if (!string.IsNullOrWhiteSpace(assignee))
-            {
-                filtered = filtered.Where(i => i.AssigneeName.Equals(assignee, StringComparison.OrdinalIgnoreCase));
-            }
-
-            if (!string.IsNullOrWhiteSpace(state))
-            {
-                filtered = filtered.Where(i => i.State.Equals(state, StringComparison.OrdinalIgnoreCase));
-            }
-
-            var result = filtered.ToList();
-            stopwatch.Stop();
-            logger.LogInformation(
-                "GET /api/issues completed in {ElapsedMs}ms. Filters: project={Project}, milestone={Milestone}, assignee={Assignee}, state={State}. Count={Count}",
-                stopwatch.ElapsedMilliseconds,
-                project ?? "(none)",
-                milestone ?? "(none)",
-                assignee ?? "(none)",
-                state ?? "(none)",
-                result.Count);
-            return Results.Ok(result);
-        })
-            .WithName("GetIssues")
-            .WithOpenApi();
-
-        group.MapGet("/milestones", async (IDashboardDataService service, ILoggerFactory loggerFactory, CancellationToken cancellationToken) =>
-        {
-            var logger = loggerFactory.CreateLogger("DashboardEndpoints");
-            var stopwatch = Stopwatch.StartNew();
-            var result = await service.GetMilestonesAsync(cancellationToken);
-            stopwatch.Stop();
-            logger.LogInformation("GET /api/milestones completed in {ElapsedMs}ms", stopwatch.ElapsedMilliseconds);
-            return Results.Ok(result);
-        })
-            .WithName("GetMilestones")
-            .WithOpenApi();
-
-        group.MapGet("/gantt", async (
-            string? viewMode,
-            string? milestone,
+        group.MapGet("/selection/options", async (
+            int? groupId,
+            int? memberId,
+            int? projectId,
             int? milestoneId,
             IDashboardDataService service,
             ILoggerFactory loggerFactory,
@@ -100,14 +29,89 @@ public static class DashboardEndpoints
         {
             var logger = loggerFactory.CreateLogger("DashboardEndpoints");
             var stopwatch = Stopwatch.StartNew();
-            var result = await service.GetGanttAsync(viewMode, milestone, milestoneId, cancellationToken);
+            var result = await service.GetSelectionOptionsAsync(groupId, memberId, projectId, milestoneId, cancellationToken);
             stopwatch.Stop();
             logger.LogInformation(
-                "GET /api/gantt completed in {ElapsedMs}ms. Filters: viewMode={ViewMode}, milestone={Milestone}, milestoneId={MilestoneId}. Count={Count}",
+                "GET /api/selection/options completed in {ElapsedMs}ms. groupId={GroupId}, memberId={MemberId}, projectId={ProjectId}, milestoneId={MilestoneId}",
                 stopwatch.ElapsedMilliseconds,
-                viewMode ?? "(none)",
-                milestone ?? "(none)",
-                milestoneId?.ToString() ?? "(none)",
+                groupId?.ToString() ?? "(none)",
+                memberId?.ToString() ?? "(none)",
+                projectId?.ToString() ?? "(none)",
+                milestoneId?.ToString() ?? "(none)");
+            return Results.Ok(result);
+        })
+            .WithName("GetSelectionOptions")
+            .WithOpenApi();
+
+        group.MapGet("/dashboard", async (
+            int? milestoneId,
+            IDashboardDataService service,
+            ILoggerFactory loggerFactory,
+            CancellationToken cancellationToken) =>
+        {
+            if (!milestoneId.HasValue)
+            {
+                return Results.BadRequest("milestoneId is required.");
+            }
+
+            var logger = loggerFactory.CreateLogger("DashboardEndpoints");
+            var stopwatch = Stopwatch.StartNew();
+            var result = await service.GetDashboardAsync(milestoneId.Value, cancellationToken);
+            stopwatch.Stop();
+            logger.LogInformation(
+                "GET /api/dashboard completed in {ElapsedMs}ms. milestoneId={MilestoneId}",
+                stopwatch.ElapsedMilliseconds,
+                milestoneId.Value);
+
+            return result is null ? Results.NotFound() : Results.Ok(result);
+        })
+            .WithName("GetDashboard")
+            .WithOpenApi();
+
+        group.MapGet("/issues", async (
+            int? milestoneId,
+            IDashboardDataService service,
+            ILoggerFactory loggerFactory,
+            CancellationToken cancellationToken) =>
+        {
+            if (!milestoneId.HasValue)
+            {
+                return Results.Ok(Array.Empty<DashboardIssue>());
+            }
+
+            var logger = loggerFactory.CreateLogger("DashboardEndpoints");
+            var stopwatch = Stopwatch.StartNew();
+            var result = await service.GetIssuesAsync(milestoneId.Value, cancellationToken);
+            stopwatch.Stop();
+            logger.LogInformation(
+                "GET /api/issues completed in {ElapsedMs}ms. milestoneId={MilestoneId}. Count={Count}",
+                stopwatch.ElapsedMilliseconds,
+                milestoneId.Value,
+                result.Count);
+            return Results.Ok(result);
+        })
+            .WithName("GetIssues")
+            .WithOpenApi();
+
+        group.MapGet("/gantt", async (
+            int? milestoneId,
+            IDashboardDataService service,
+            ILoggerFactory loggerFactory,
+            CancellationToken cancellationToken) =>
+        {
+            if (!milestoneId.HasValue)
+            {
+                return Results.Ok(Array.Empty<GanttItemDto>());
+            }
+
+            var logger = loggerFactory.CreateLogger("DashboardEndpoints");
+            var stopwatch = Stopwatch.StartNew();
+            var result = await service.GetGanttAsync(milestoneId.Value, cancellationToken);
+            stopwatch.Stop();
+            logger.LogInformation(
+                "GET /api/gantt completed in {ElapsedMs}ms. milestoneId={MilestoneId}. Count={Count}",
+                stopwatch.ElapsedMilliseconds,
+                milestoneId.Value,
                 result.Count);
             return Results.Ok(result);
         })

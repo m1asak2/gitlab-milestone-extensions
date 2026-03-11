@@ -8,6 +8,7 @@ public interface IGitLabDataSnapshotService
 }
 
 public sealed record GitLabDataSnapshot(
+    IReadOnlyList<GitLabGroupDto> Groups,
     IReadOnlyList<GitLabProjectDto> Projects,
     IReadOnlyList<GitLabMilestoneDto> Milestones,
     IReadOnlyList<GitLabIssueDto> Issues,
