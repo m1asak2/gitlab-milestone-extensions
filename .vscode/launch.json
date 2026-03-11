@@ -7,6 +7,7 @@
       "request": "launch",
       "projectPath": "${workspaceFolder}/gitlab-milestone-extensions.AppHost/gitlab-milestone-extensions.AppHost.csproj",
       "preLaunchTask": "build-solution",
+      "postDebugTask": "cleanup-apphost-processes",
       "cwd": "${workspaceFolder}",
       "env": {
         "ASPNETCORE_ENVIRONMENT": "Development"

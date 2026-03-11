@@ -22,6 +22,19 @@
         "${workspaceFolder}/gitlab-milestone-extensions.AppHost/gitlab-milestone-extensions.AppHost.csproj"
       ],
       "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "cleanup-apphost-processes",
+      "type": "process",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        "$workspace = '${workspaceFolder}'.Replace('/', '\\'); $workspacePattern = [regex]::Escape($workspace); for ($i = 0; $i -lt 5; $i++) { $targets = Get-CimInstance Win32_Process | Where-Object { ($_.Name -eq 'dotnet.exe' -and $_.CommandLine -match $workspacePattern -and $_.CommandLine -match 'gitlab-milestone-extensions\\.(AppHost|ApiService|Web)') -or ($_.Name -eq 'dotnet.exe' -and $_.CommandLine -match 'Aspire\\.Dashboard') -or ($_.Name -in @('dcp.exe', 'dcpctrl.exe', 'gitlab-milestone-extensions.AppHost.exe')) }; if (-not $targets) { break }; foreach ($p in $targets) { try { Stop-Process -Id $p.ProcessId -Force -ErrorAction Stop } catch {} }; Start-Sleep -Milliseconds 300 }; dotnet build-server shutdown *> $null"
+      ],
+      "problemMatcher": []
     }
   ]
 }
