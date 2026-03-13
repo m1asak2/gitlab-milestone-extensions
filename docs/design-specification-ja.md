@@ -405,7 +405,8 @@ Milestone 取得仕様:
 表示要素:
 
 - タイトル `GitLab Milestone Dashboard`
-- `Refresh` ボタン
+- GitLab 認証済みユーザー名の表示
+- `Change Token` ボタン（token 入力欄を非表示にしている場合のみ）
 - Group / Member / Project / Milestone の 4 つのセレクタ
 - セレクタ取得失敗時のエラーメッセージ
 - 各ページ本文
