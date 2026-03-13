@@ -74,6 +74,7 @@ The Web project must never call GitLab directly.
 - Prioritize Application and Infrastructure tests.
 - Mock GitLab API responses in tests.
 - Do not depend on a live GitLab server for CI.
+- For each instructed change, add or update tests and verify they pass.
 
 ## Non-Goals
 - Editing milestones/issues

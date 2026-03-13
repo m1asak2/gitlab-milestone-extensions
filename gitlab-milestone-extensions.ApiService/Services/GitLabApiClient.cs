@@ -57,13 +57,24 @@ public class GitLabApiClient
     public async Task<IReadOnlyList<GitLabProjectDto>> GetProjectsAsync(CancellationToken cancellationToken = default)
     {
         var stopwatch = Stopwatch.StartNew();
-        var projects = await GetPagedAsync<GitLabProjectResponse>(
-            $"groups/{_groupId}/projects",
+        var groupProjectsTask = GetPagedAsync<GitLabProjectResponse>(
+            $"groups/{_groupId}/projects?include_subgroups=true",
             cancellationToken);
+        var membershipProjectsTask = GetPagedAsync<GitLabProjectResponse>(
+            "projects?membership=true&simple=true",
+            cancellationToken);
+        await Task.WhenAll(groupProjectsTask, membershipProjectsTask);
+
+        var projects = (await groupProjectsTask)
+            .Concat(await membershipProjectsTask)
+            .GroupBy(p => p.Id)
+            .Select(g => g.First())
+            .ToList();
         stopwatch.Stop();
         _logger.LogInformation(
-            "GitLab projects fetched in {ElapsedMs}ms. Count={Count}",
+            "GitLab projects fetched in {ElapsedMs}ms. GroupId={GroupId}, Count={Count}",
             stopwatch.ElapsedMilliseconds,
+            _groupId,
             projects.Count);
 
         return projects

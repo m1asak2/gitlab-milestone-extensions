@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\gitlab-milestone-extensions.AppHost\gitlab-milestone-extensions.AppHost.csproj" />
+    <ProjectReference Include="..\gitlab-milestone-extensions.ApiService\gitlab-milestone-extensions.ApiService.csproj" />
   </ItemGroup>
 
   <ItemGroup>

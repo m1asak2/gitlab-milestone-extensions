@@ -12,7 +12,9 @@ public sealed class DummyDashboardDataService : IDashboardDataService
         new DashboardIssue("Dashboard.Api", 10, 201, "MVP Sprint 1", "API endpoint skeleton", "opened", 1, "Alice", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(2)), 7200, 1800, "2h", "30m", 101),
         new DashboardIssue("Dashboard.Web", 11, 201, "MVP Sprint 1", "Blazor dashboard shell", "opened", 2, "Bob", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(4)), 10800, 3600, "3h", "1h", 102),
         new DashboardIssue("Dashboard.Web", 11, 201, "MVP Sprint 1", "Milestone progress card", "closed", 3, "Carla", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1)), 5400, 5400, "1h 30m", "1h 30m", 103),
-        new DashboardIssue("Dashboard.Api", 10, 202, "MVP Sprint 2", "Dummy gantt API data", "opened", 1, "Alice", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(6)), 14400, 1800, "4h", "30m", 104)
+        new DashboardIssue("Dashboard.Api", 10, 202, "MVP Sprint 2", "Dummy gantt API data", "opened", 1, "Alice", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(6)), 14400, 1800, "4h", "30m", 104),
+        new DashboardIssue("Default Group", 4, 301, "Group Planning", "Cross-project kickoff", "opened", 4, "Dylan", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(3)), 3600, 600, "1h", "10m", 105),
+        new DashboardIssue("Standalone.Tools", 12, 401, "Standalone Milestone", "Non-group project task", "opened", 5, "Eve", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(5)), 5400, 900, "1h 30m", "15m", 106)
     ];
 
     private static readonly IReadOnlyList<SelectorGroupDto> Groups =
@@ -23,13 +25,16 @@ public sealed class DummyDashboardDataService : IDashboardDataService
     private static readonly IReadOnlyList<SelectorProjectDto> Projects =
     [
         new SelectorProjectDto(10, "Dashboard.Api"),
-        new SelectorProjectDto(11, "Dashboard.Web")
+        new SelectorProjectDto(11, "Dashboard.Web"),
+        new SelectorProjectDto(12, "Standalone.Tools")
     ];
 
     private static readonly IReadOnlyList<SelectorMilestoneDto> Milestones =
     [
         new SelectorMilestoneDto(201, "MVP Sprint 1", 10, "Dashboard.Api", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-7)), DateOnly.FromDateTime(DateTime.UtcNow.AddDays(7))),
-        new SelectorMilestoneDto(202, "MVP Sprint 2", 10, "Dashboard.Api", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(8)), DateOnly.FromDateTime(DateTime.UtcNow.AddDays(21)))
+        new SelectorMilestoneDto(202, "MVP Sprint 2", 10, "Dashboard.Api", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(8)), DateOnly.FromDateTime(DateTime.UtcNow.AddDays(21))),
+        new SelectorMilestoneDto(301, "Group Planning", 4, "Default Group", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-3)), DateOnly.FromDateTime(DateTime.UtcNow.AddDays(10))),
+        new SelectorMilestoneDto(401, "Standalone Milestone", 12, "Standalone.Tools", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-2)), DateOnly.FromDateTime(DateTime.UtcNow.AddDays(14)))
     ];
 
     public Task<SelectionOptionsDto> GetSelectionOptionsAsync(
