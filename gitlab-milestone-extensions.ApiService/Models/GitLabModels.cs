@@ -1,5 +1,12 @@
 namespace gitlab_milestone_extensions.ApiService.Models;
 
+public sealed record GitLabCurrentUserDto(
+    int UserId,
+    string Name,
+    string Username,
+    string? AvatarUrl,
+    string? WebUrl);
+
 public sealed record GitLabProjectDto(
     int ProjectId,
     string ProjectName,

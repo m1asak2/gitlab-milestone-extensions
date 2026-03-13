@@ -4,25 +4,32 @@ using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using gitlab_milestone_extensions.ApiService.Models;
 using gitlab_milestone_extensions.ApiService.Options;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 
 namespace gitlab_milestone_extensions.ApiService.Services;
 
 public class GitLabApiClient
 {
+    private const string ClientPrivateTokenHeaderName = "PRIVATE-TOKEN";
+    private const string RequestPrivateTokenHeaderName = "X-GitLab-Private-Token";
     private readonly HttpClient _httpClient;
     private readonly int _groupId;
+    private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly ILogger<GitLabApiClient> _logger;
 
-    public GitLabApiClient(HttpClient httpClient, IOptions<GitLabOptions> options, ILogger<GitLabApiClient> logger)
+    public GitLabApiClient(
+        HttpClient httpClient,
+        IOptions<GitLabOptions> options,
+        IHttpContextAccessor httpContextAccessor,
+        ILogger<GitLabApiClient> logger)
     {
         var opt = options.Value;
         _groupId = opt.GroupId;
+        _httpContextAccessor = httpContextAccessor;
         _logger = logger;
 
         httpClient.BaseAddress = new Uri($"{opt.BaseUrl.TrimEnd('/')}/api/v4/");
-        httpClient.DefaultRequestHeaders.Remove("PRIVATE-TOKEN");
-        httpClient.DefaultRequestHeaders.TryAddWithoutValidation("PRIVATE-TOKEN", opt.PrivateToken);
         httpClient.DefaultRequestHeaders.Accept.Add(
             new MediaTypeWithQualityHeaderValue("application/json"));
 
@@ -31,6 +38,7 @@ public class GitLabApiClient
 
     public async Task<T?> GetAsync<T>(string url, CancellationToken cancellationToken = default)
     {
+        ApplyPrivateTokenHeader();
         var stopwatch = Stopwatch.StartNew();
         try
         {
@@ -95,6 +103,22 @@ public class GitLabApiClient
             _groupId);
 
         return new GitLabGroupDto(group.Id, group.Name, group.WebUrl);
+    }
+
+    public async Task<GitLabCurrentUserDto> GetCurrentUserAsync(CancellationToken cancellationToken = default)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        var user = await GetAsync<GitLabCurrentUserResponse>("user", cancellationToken)
+            ?? throw new InvalidOperationException("GitLab user could not be resolved from the provided token.");
+        stopwatch.Stop();
+
+        _logger.LogInformation(
+            "GitLab current user fetched in {ElapsedMs}ms. UserId={UserId}, Username={Username}",
+            stopwatch.ElapsedMilliseconds,
+            user.Id,
+            user.Username);
+
+        return new GitLabCurrentUserDto(user.Id, user.Name, user.Username, user.AvatarUrl, user.WebUrl);
     }
 
     public async Task<IReadOnlyList<GitLabMilestoneDto>> GetProjectMilestonesAsync(CancellationToken cancellationToken = default)
@@ -223,6 +247,7 @@ public class GitLabApiClient
 
     private async Task<List<T>> GetPagedAsync<T>(string url, CancellationToken cancellationToken = default)
     {
+        ApplyPrivateTokenHeader();
         var allItems = new List<T>();
         var page = 1;
 
@@ -268,6 +293,18 @@ public class GitLabApiClient
         return allItems;
     }
 
+    private void ApplyPrivateTokenHeader()
+    {
+        var privateToken = _httpContextAccessor.HttpContext?.Request.Headers[RequestPrivateTokenHeaderName].ToString();
+        if (string.IsNullOrWhiteSpace(privateToken))
+        {
+            throw new InvalidOperationException("GitLab private token is required.");
+        }
+
+        _httpClient.DefaultRequestHeaders.Remove(ClientPrivateTokenHeaderName);
+        _httpClient.DefaultRequestHeaders.TryAddWithoutValidation(ClientPrivateTokenHeaderName, privateToken);
+    }
+
     private sealed record GitLabProjectResponse(
         [property: JsonPropertyName("id")] int Id,
         [property: JsonPropertyName("name")] string Name,
@@ -276,6 +313,13 @@ public class GitLabApiClient
     private sealed record GitLabGroupResponse(
         [property: JsonPropertyName("id")] int Id,
         [property: JsonPropertyName("name")] string Name,
+        [property: JsonPropertyName("web_url")] string? WebUrl);
+
+    private sealed record GitLabCurrentUserResponse(
+        [property: JsonPropertyName("id")] int Id,
+        [property: JsonPropertyName("name")] string Name,
+        [property: JsonPropertyName("username")] string Username,
+        [property: JsonPropertyName("avatar_url")] string? AvatarUrl,
         [property: JsonPropertyName("web_url")] string? WebUrl);
 
     private sealed record GitLabMilestoneResponse(

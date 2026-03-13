@@ -18,6 +18,19 @@
         <a href="" class="reload">Reload</a>
         <a class="dismiss">x</a>
     </div>
+    <script>
+        window.gitlabMilestoneExtensionsTokenStore = {
+            get: function (key) {
+                return window.localStorage.getItem(key);
+            },
+            set: function (key, value) {
+                window.localStorage.setItem(key, value);
+            },
+            remove: function (key) {
+                window.localStorage.removeItem(key);
+            }
+        };
+    </script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
     <script src="_framework/blazor.webassembly.js"></script>
 </body>

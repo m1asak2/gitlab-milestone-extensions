@@ -24,6 +24,14 @@ public static class GitLabEndpoints
         .WithName("GetGitLabProjects")
         .WithOpenApi();
 
+        group.MapGet("/user", async (GitLabApiClient client, CancellationToken cancellationToken) =>
+        {
+            var user = await client.GetCurrentUserAsync(cancellationToken);
+            return Results.Ok(user);
+        })
+        .WithName("GetGitLabCurrentUser")
+        .WithOpenApi();
+
         group.MapGet("/milestones", async (GitLabApiClient client, CancellationToken cancellationToken) =>
         {
             var milestones = await client.GetProjectMilestonesAsync(cancellationToken);

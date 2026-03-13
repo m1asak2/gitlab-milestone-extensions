@@ -1,5 +1,12 @@
 namespace gitlab_milestone_extensions.Web.Models;
 
+public sealed record GitLabCurrentUserViewModel(
+    int UserId,
+    string Name,
+    string Username,
+    string? AvatarUrl,
+    string? WebUrl);
+
 public sealed record MilestoneDashboardViewModel(
     int MilestoneId,
     string MilestoneTitle,

@@ -1,4 +1,7 @@
 using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Text;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Memory;
 
 namespace gitlab_milestone_extensions.ApiService.Services;
@@ -6,16 +9,19 @@ namespace gitlab_milestone_extensions.ApiService.Services;
 public sealed class CachedGitLabDataSnapshotService(
     IMemoryCache memoryCache,
     GitLabApiClient gitLabApiClient,
+    IHttpContextAccessor httpContextAccessor,
     ILogger<CachedGitLabDataSnapshotService> logger) : IGitLabDataSnapshotService
 {
-    private const string CacheKey = "gitlab:data:snapshot:v1";
+    private const string RequestPrivateTokenHeaderName = "X-GitLab-Private-Token";
+    private const string CacheKeyPrefix = "gitlab:data:snapshot:v2:";
     private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
     private readonly SemaphoreSlim _fetchLock = new(1, 1);
 
     public async Task<GitLabDataSnapshot> GetSnapshotAsync(CancellationToken cancellationToken)
     {
+        var cacheKey = $"{CacheKeyPrefix}{ComputeTokenHash(GetRequiredPrivateToken(httpContextAccessor))}";
         var stopwatch = Stopwatch.StartNew();
-        if (memoryCache.TryGetValue<GitLabDataSnapshot>(CacheKey, out var cacheHit) && cacheHit is not null)
+        if (memoryCache.TryGetValue<GitLabDataSnapshot>(cacheKey, out var cacheHit) && cacheHit is not null)
         {
             stopwatch.Stop();
             logger.LogInformation(
@@ -28,7 +34,7 @@ public sealed class CachedGitLabDataSnapshotService(
         await _fetchLock.WaitAsync(cancellationToken);
         try
         {
-            if (memoryCache.TryGetValue<GitLabDataSnapshot>(CacheKey, out cacheHit) && cacheHit is not null)
+            if (memoryCache.TryGetValue<GitLabDataSnapshot>(cacheKey, out cacheHit) && cacheHit is not null)
             {
                 stopwatch.Stop();
                 logger.LogInformation(
@@ -69,7 +75,7 @@ public sealed class CachedGitLabDataSnapshotService(
                 issues,
                 DateTimeOffset.UtcNow);
 
-            memoryCache.Set(CacheKey, snapshot, new MemoryCacheEntryOptions
+            memoryCache.Set(cacheKey, snapshot, new MemoryCacheEntryOptions
             {
                 AbsoluteExpirationRelativeToNow = CacheDuration
             });
@@ -89,5 +95,22 @@ public sealed class CachedGitLabDataSnapshotService(
         {
             _fetchLock.Release();
         }
+    }
+
+    private static string GetRequiredPrivateToken(IHttpContextAccessor httpContextAccessor)
+    {
+        var privateToken = httpContextAccessor.HttpContext?.Request.Headers[RequestPrivateTokenHeaderName].ToString();
+        if (string.IsNullOrWhiteSpace(privateToken))
+        {
+            throw new InvalidOperationException("GitLab private token is required.");
+        }
+
+        return privateToken;
+    }
+
+    private static string ComputeTokenHash(string privateToken)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(privateToken));
+        return Convert.ToHexString(bytes);
     }
 }

@@ -2,12 +2,30 @@ namespace gitlab_milestone_extensions.Web.Services;
 
 public sealed class MilestoneSelectionState
 {
+    public string? PrivateToken { get; private set; }
     public int? SelectedGroupId { get; private set; }
     public int? SelectedMemberId { get; private set; }
     public int? SelectedProjectId { get; private set; }
     public int? SelectedMilestoneId { get; private set; }
+    public bool HasPrivateToken => !string.IsNullOrWhiteSpace(PrivateToken);
 
     public event Action? Changed;
+
+    public void SetPrivateToken(string? privateToken)
+    {
+        var normalizedToken = string.IsNullOrWhiteSpace(privateToken) ? null : privateToken.Trim();
+        if (string.Equals(PrivateToken, normalizedToken, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        PrivateToken = normalizedToken;
+        SelectedGroupId = null;
+        SelectedMemberId = null;
+        SelectedProjectId = null;
+        SelectedMilestoneId = null;
+        Changed?.Invoke();
+    }
 
     public void SetGroup(int? groupId)
     {

@@ -4,6 +4,7 @@ using System.Text.Json;
 using gitlab_milestone_extensions.ApiService.Models;
 using gitlab_milestone_extensions.ApiService.Options;
 using gitlab_milestone_extensions.ApiService.Services;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -13,12 +14,38 @@ namespace gitlab_milestone_extensions.Tests;
 public sealed class GitLabApiClientTests
 {
     [Fact]
+    public async Task GetCurrentUserAsync_UsesPrivateTokenAndReturnsUser()
+    {
+        var handler = new StubHttpMessageHandler(request =>
+        {
+            Assert.Equal("/api/v4/user", request.RequestUri?.AbsolutePath);
+            Assert.Equal("user-token", request.Headers.GetValues("PRIVATE-TOKEN").Single());
+
+            return CreateJsonResponse(new
+            {
+                id = 7,
+                name = "Misa",
+                username = "misa",
+                avatar_url = "https://gitlab.example.local/uploads/avatar.png",
+                web_url = "https://gitlab.example.local/misa"
+            });
+        });
+
+        var user = await CreateClient(handler).GetCurrentUserAsync(CancellationToken.None);
+
+        Assert.Equal(7, user.UserId);
+        Assert.Equal("Misa", user.Name);
+        Assert.Equal("misa", user.Username);
+    }
+
+    [Fact]
     public async Task GetProjectMilestonesAsync_UsesMilestoneIidInProjectWebUrl()
     {
         var handler = new StubHttpMessageHandler(request =>
         {
             Assert.Equal("/api/v4/projects/101/milestones", request.RequestUri?.AbsolutePath);
             Assert.Equal("per_page=100&page=1", request.RequestUri?.Query.TrimStart('?'));
+            Assert.Equal("user-token", request.Headers.GetValues("PRIVATE-TOKEN").Single());
 
             return CreateJsonResponse(new[]
             {
@@ -80,10 +107,12 @@ public sealed class GitLabApiClientTests
         });
 
         using var memoryCache = new MemoryCache(new MemoryCacheOptions());
-        var apiClient = CreateClient(handler);
+        var httpContextAccessor = CreateHttpContextAccessor();
+        var apiClient = CreateClient(handler, httpContextAccessor);
         var snapshotService = new CachedGitLabDataSnapshotService(
             memoryCache,
             apiClient,
+            httpContextAccessor,
             NullLogger<CachedGitLabDataSnapshotService>.Instance);
 
         var snapshot = await snapshotService.GetSnapshotAsync(CancellationToken.None);
@@ -92,17 +121,31 @@ public sealed class GitLabApiClientTests
         Assert.Equal("https://gitlab.example.local/groups/platform/-/milestones/301", milestone.WebUrl);
     }
 
-    private static GitLabApiClient CreateClient(HttpMessageHandler handler)
+    private static GitLabApiClient CreateClient(HttpMessageHandler handler, IHttpContextAccessor? httpContextAccessor = null)
     {
         var httpClient = new HttpClient(handler);
         var options = Options.Create(new GitLabOptions
         {
             BaseUrl = "https://gitlab.example.local",
-            PrivateToken = "token",
             GroupId = 4
         });
+        httpContextAccessor ??= CreateHttpContextAccessor();
 
-        return new GitLabApiClient(httpClient, options, NullLogger<GitLabApiClient>.Instance);
+        return new GitLabApiClient(
+            httpClient,
+            options,
+            httpContextAccessor,
+            NullLogger<GitLabApiClient>.Instance);
+    }
+
+    private static IHttpContextAccessor CreateHttpContextAccessor()
+    {
+        var httpContext = new DefaultHttpContext();
+        httpContext.Request.Headers["X-GitLab-Private-Token"] = "user-token";
+        return new HttpContextAccessor
+        {
+            HttpContext = httpContext
+        };
     }
 
     private static HttpResponseMessage CreateJsonResponse<T>(T value)

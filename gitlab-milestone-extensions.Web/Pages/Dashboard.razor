@@ -32,6 +32,10 @@ else if (!string.IsNullOrWhiteSpace(_errorMessage))
 {
     <MudAlert Severity="Severity.Error">@_errorMessage</MudAlert>
 }
+else if (!SelectionState.HasPrivateToken)
+{
+    <MudAlert Severity="Severity.Info">GitLab のデータを表示するには、画面上部に Private Token を入力してください。</MudAlert>
+}
 else if (SelectionState.SelectedMilestoneId is null)
 {
     <MudAlert Severity="Severity.Info">Milestone を選択してください。未選択時は Dashboard / Issues / Gantt のデータは表示されません。</MudAlert>
@@ -112,19 +116,35 @@ else
         </MudTabPanel>
 
         <MudTabPanel Text="Issues">
-            <div class="mb-3 issue-filter">
-                <label class="selector-label" for="issue-state-select">State</label>
-                <select id="issue-state-select"
-                        class="selector-input"
-                        value="@_issueStateFilter"
-                        @onchange="OnIssueStateFilterChanged">
-                    <option value="@AllStatesValue">All</option>
-                    @foreach (var state in _issueStates)
-                    {
-                        <option value="@state">@state</option>
-                    }
-                </select>
-            </div>
+            <MudGrid Class="mb-3">
+                <MudItem xs="12" sm="6" md="3">
+                    <label class="selector-label" for="issue-state-select">State</label>
+                    <select id="issue-state-select"
+                            class="selector-input"
+                            value="@_issueStateFilter"
+                            @onchange="OnIssueStateFilterChanged">
+                        <option value="@AllStatesValue">All</option>
+                        @foreach (var state in _issueStates)
+                        {
+                            <option value="@state">@state</option>
+                        }
+                    </select>
+                </MudItem>
+
+                <MudItem xs="12" sm="6" md="3">
+                    <label class="selector-label" for="issue-assignee-select">Assignee</label>
+                    <select id="issue-assignee-select"
+                            class="selector-input"
+                            value="@_issueAssigneeFilter"
+                            @onchange="OnIssueAssigneeFilterChanged">
+                        <option value="@AllAssigneesValue">All</option>
+                        @foreach (var assignee in _issueAssignees)
+                        {
+                            <option value="@assignee">@assignee</option>
+                        }
+                    </select>
+                </MudItem>
+            </MudGrid>
 
             <MudTable Items="_filteredIssues">
                 <HeaderContent>
@@ -169,7 +189,23 @@ else
             </MudTabPanel>
 
             <MudTabPanel Text="Gantt">
-                <MudTable Items="_ganttItems">
+                <MudGrid Class="mb-3">
+                    <MudItem xs="12" sm="6" md="3">
+                        <label class="selector-label" for="gantt-assignee-select">Assignee</label>
+                        <select id="gantt-assignee-select"
+                                class="selector-input"
+                                value="@_ganttAssigneeFilter"
+                                @onchange="OnGanttAssigneeFilterChanged">
+                            <option value="@AllAssigneesValue">All</option>
+                            @foreach (var assignee in _ganttAssignees)
+                            {
+                                <option value="@assignee">@assignee</option>
+                            }
+                        </select>
+                    </MudItem>
+                </MudGrid>
+
+                <MudTable Items="_filteredGanttItems">
                     <HeaderContent>
                         <MudTh>Title</MudTh>
                         <MudTh>Mode</MudTh>
@@ -202,10 +238,16 @@ else
     private IReadOnlyList<MemberWorkloadViewModel> _memberWorkloads = [];
     private IReadOnlyList<IssueViewModel> _filteredIssues = [];
     private IReadOnlyList<string> _issueStates = [];
+    private IReadOnlyList<string> _issueAssignees = [];
+    private IReadOnlyList<string> _ganttAssignees = [];
+    private IReadOnlyList<GanttItemViewModel> _filteredGanttItems = [];
     private int _activeTabIndex;
     private string _issueStateFilter = AllStatesValue;
+    private string _issueAssigneeFilter = AllAssigneesValue;
+    private string _ganttAssigneeFilter = AllAssigneesValue;
 
     private const string AllStatesValue = "__all__";
+    private const string AllAssigneesValue = "__all__";
 
     protected override async Task OnInitializedAsync()
     {
@@ -227,6 +269,25 @@ else
     {
         _errorMessage = null;
 
+        if (!SelectionState.HasPrivateToken)
+        {
+            _dashboard = null;
+            _issues = [];
+            _ganttItems = [];
+            _memberWorkloads = [];
+            _filteredIssues = [];
+            _issueStates = [];
+            _issueAssignees = [];
+            _ganttAssignees = [];
+            _filteredGanttItems = [];
+            _issueStateFilter = AllStatesValue;
+            _issueAssigneeFilter = AllAssigneesValue;
+            _ganttAssigneeFilter = AllAssigneesValue;
+            _isLoading = false;
+            StateHasChanged();
+            return;
+        }
+
         var milestoneId = SelectionState.SelectedMilestoneId;
         if (!milestoneId.HasValue)
         {
@@ -236,7 +297,12 @@ else
             _memberWorkloads = [];
             _filteredIssues = [];
             _issueStates = [];
+            _issueAssignees = [];
+            _ganttAssignees = [];
+            _filteredGanttItems = [];
             _issueStateFilter = AllStatesValue;
+            _issueAssigneeFilter = AllAssigneesValue;
+            _ganttAssigneeFilter = AllAssigneesValue;
             _isLoading = false;
             StateHasChanged();
             return;
@@ -257,13 +323,34 @@ else
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(state => state, StringComparer.OrdinalIgnoreCase)
                 .ToList();
+            _issueAssignees = _issues
+                .Select(issue => string.IsNullOrWhiteSpace(issue.Assignee) ? "Unassigned" : issue.Assignee)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(assignee => assignee, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            _ganttAssignees = _ganttItems
+                .Select(item => string.IsNullOrWhiteSpace(item.Assignee) ? "Unassigned" : item.Assignee)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(assignee => assignee, StringComparer.OrdinalIgnoreCase)
+                .ToList();
 
             if (_issueStateFilter != AllStatesValue && !_issueStates.Contains(_issueStateFilter, StringComparer.OrdinalIgnoreCase))
             {
                 _issueStateFilter = AllStatesValue;
             }
 
+            if (_issueAssigneeFilter != AllAssigneesValue && !_issueAssignees.Contains(_issueAssigneeFilter, StringComparer.OrdinalIgnoreCase))
+            {
+                _issueAssigneeFilter = AllAssigneesValue;
+            }
+
+            if (_ganttAssigneeFilter != AllAssigneesValue && !_ganttAssignees.Contains(_ganttAssigneeFilter, StringComparer.OrdinalIgnoreCase))
+            {
+                _ganttAssigneeFilter = AllAssigneesValue;
+            }
+
             ApplyIssueFilter();
+            ApplyGanttFilter();
         }
         catch (Exception ex)
         {
@@ -274,6 +361,9 @@ else
             _memberWorkloads = [];
             _filteredIssues = [];
             _issueStates = [];
+            _issueAssignees = [];
+            _ganttAssignees = [];
+            _filteredGanttItems = [];
         }
         finally
         {
@@ -323,19 +413,40 @@ else
         ApplyIssueFilter();
     }
 
+    private void OnIssueAssigneeFilterChanged(ChangeEventArgs args)
+    {
+        _issueAssigneeFilter = args.Value?.ToString() ?? AllAssigneesValue;
+        ApplyIssueFilter();
+    }
+
+    private void OnGanttAssigneeFilterChanged(ChangeEventArgs args)
+    {
+        _ganttAssigneeFilter = args.Value?.ToString() ?? AllAssigneesValue;
+        ApplyGanttFilter();
+    }
+
     private void ApplyIssueFilter()
     {
-        _filteredIssues = _issueStateFilter == AllStatesValue
-            ? _issues
-            : _issues
-                .Where(issue => issue.State.Equals(_issueStateFilter, StringComparison.OrdinalIgnoreCase))
-                .ToList();
+        _filteredIssues = _issues
+            .Where(issue => _issueStateFilter == AllStatesValue ||
+                issue.State.Equals(_issueStateFilter, StringComparison.OrdinalIgnoreCase))
+            .Where(issue => _issueAssigneeFilter == AllAssigneesValue ||
+                NormalizeAssignee(issue.Assignee).Equals(_issueAssigneeFilter, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
+
+    private void ApplyGanttFilter()
+    {
+        _filteredGanttItems = _ganttItems
+            .Where(item => _ganttAssigneeFilter == AllAssigneesValue ||
+                NormalizeAssignee(item.Assignee).Equals(_ganttAssigneeFilter, StringComparison.OrdinalIgnoreCase))
+            .ToList();
     }
 
     private static IReadOnlyList<MemberWorkloadViewModel> BuildMemberWorkloads(IReadOnlyList<IssueViewModel> issues)
     {
         return issues
-            .GroupBy(issue => string.IsNullOrWhiteSpace(issue.Assignee) ? "Unassigned" : issue.Assignee)
+            .GroupBy(issue => NormalizeAssignee(issue.Assignee))
             .Select(group => new MemberWorkloadViewModel(
                 group.Key,
                 group.Sum(issue => issue.TimeEstimateSeconds),
@@ -344,6 +455,9 @@ else
             .ThenBy(item => item.MemberName, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
+
+    private static string NormalizeAssignee(string? assignee)
+        => string.IsNullOrWhiteSpace(assignee) ? "Unassigned" : assignee;
 
     private sealed record MemberWorkloadViewModel(
         string MemberName,

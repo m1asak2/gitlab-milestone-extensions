@@ -9,9 +9,10 @@ builder.AddServiceDefaults();
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 builder.Services.AddMemoryCache();
+builder.Services.AddHttpContextAccessor();
 builder.Services.Configure<GitLabOptions>(builder.Configuration.GetSection("GitLab"));
 builder.Services.AddHttpClient<GitLabApiClient>();
-builder.Services.AddSingleton<IGitLabDataSnapshotService, CachedGitLabDataSnapshotService>();
+builder.Services.AddScoped<IGitLabDataSnapshotService, CachedGitLabDataSnapshotService>();
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
