@@ -71,3 +71,6 @@ src/
 ├─ gitlab-milestone-extensions.ServiceDefaults/
 ├─ gitlab-milestone-extensions.Api/
 └─ gitlab-milestone-extensions.Web/
+
+## OpenAPI
+https://localhost:7364/scalar/v1
