@@ -76,6 +76,12 @@ The Web project must never call GitLab directly.
 - Do not depend on a live GitLab server for CI.
 - For each instructed change, add or update tests and verify they pass.
 
+## Commit Rules
+- Before committing, rewrite the `GitLab` section in both `appsettings.json` and `appsettings.Development.json` as:
+  - `"BaseUrl": "http://gitlab.local"`
+  - `"PrivateToken": "YOUR_PRIVATE"`
+- After commit (and push when needed), restore local files to the original real values.
+
 ## Non-Goals
 - Editing milestones/issues
 - GitLab webhook processing
