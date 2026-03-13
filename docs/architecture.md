@@ -19,6 +19,13 @@
 | `gitlab-milestone-extensions.ServiceDefaults` | OpenTelemetry / Health Check / Service Discovery などの共通設定 |
 | `gitlab-milestone-extensions.Tests` | xUnit による回帰テストと疎通確認 |
 
+## Deployment Shape
+
+- 開発時は `gitlab-milestone-extensions.AppHost` から `ApiService` と `Web` を起動する
+- Docker 配備対象は `gitlab-milestone-extensions.ApiService` と `gitlab-milestone-extensions.Web` のみとする
+- `Web` は nginx 上で静的配信し、`/api` を `ApiService` へリバースプロキシする
+- `Web` からの API 呼び出しは相対パス `/api/*` を使用する
+
 ## Data Flow
 
 1. `Web` が `ApiService` の `/api/selection/options` でセレクタ候補を取得する
@@ -82,7 +89,7 @@
 
 ## Design Rationale
 
-- GitLab token をブラウザに出さないため、GitLab 呼び出しは backend のみで行う
+- GitLab 呼び出しは backend のみで行い、Web 側は `X-GitLab-Private-Token` を API へ転送する
 - 複数 project の issue / milestone をまとめて扱うため、API 側で集約する
 - selector と詳細表示を分け、`milestoneId` を中心に UI を単純化する
 - GitLab 画面へのリンクを API 側で生成し、Web 側では URL の知識を持たない構成にしている

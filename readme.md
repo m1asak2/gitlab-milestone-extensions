@@ -80,3 +80,7 @@ gitlab-milestone-extensions/
 
 ## OpenAPI
 https://localhost:7364/scalar/v1
+
+## Docker
+
+Docker 構成と運用方針は `docs/docker-deployment.md` を参照してください。
