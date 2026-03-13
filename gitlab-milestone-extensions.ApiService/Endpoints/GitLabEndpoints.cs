@@ -13,40 +13,35 @@ public static class GitLabEndpoints
             var groups = await client.GetAsync<object>("groups", cancellationToken);
             return Results.Ok(groups);
         })
-        .WithName("TestGitLabConnection")
-        .WithOpenApi();
+        .WithName("TestGitLabConnection");
 
         group.MapGet("/projects", async (GitLabApiClient client, CancellationToken cancellationToken) =>
         {
             var projects = await client.GetProjectsAsync(cancellationToken);
             return Results.Ok(projects);
         })
-        .WithName("GetGitLabProjects")
-        .WithOpenApi();
+        .WithName("GetGitLabProjects");
 
         group.MapGet("/user", async (GitLabApiClient client, CancellationToken cancellationToken) =>
         {
             var user = await client.GetCurrentUserAsync(cancellationToken);
             return Results.Ok(user);
         })
-        .WithName("GetGitLabCurrentUser")
-        .WithOpenApi();
+        .WithName("GetGitLabCurrentUser");
 
         group.MapGet("/milestones", async (GitLabApiClient client, CancellationToken cancellationToken) =>
         {
             var milestones = await client.GetProjectMilestonesAsync(cancellationToken);
             return Results.Ok(milestones);
         })
-        .WithName("GetGitLabProjectMilestones")
-        .WithOpenApi();
+        .WithName("GetGitLabProjectMilestones");
 
         group.MapGet("/issues", async (GitLabApiClient client, CancellationToken cancellationToken) =>
         {
             var issues = await client.GetProjectIssuesAsync(cancellationToken);
             return Results.Ok(issues);
         })
-        .WithName("GetGitLabProjectIssues")
-        .WithOpenApi();
+        .WithName("GetGitLabProjectIssues");
 
         return app;
     }

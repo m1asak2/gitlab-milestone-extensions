@@ -40,8 +40,7 @@ public static class DashboardEndpoints
                 milestoneId?.ToString() ?? "(none)");
             return Results.Ok(result);
         })
-            .WithName("GetSelectionOptions")
-            .WithOpenApi();
+            .WithName("GetSelectionOptions");
 
         group.MapGet("/dashboard", async (
             int? milestoneId,
@@ -65,8 +64,7 @@ public static class DashboardEndpoints
 
             return result is null ? Results.NotFound() : Results.Ok(result);
         })
-            .WithName("GetDashboard")
-            .WithOpenApi();
+            .WithName("GetDashboard");
 
         group.MapGet("/issues", async (
             int? milestoneId,
@@ -90,8 +88,7 @@ public static class DashboardEndpoints
                 result.Count);
             return Results.Ok(result);
         })
-            .WithName("GetIssues")
-            .WithOpenApi();
+            .WithName("GetIssues");
 
         group.MapGet("/gantt", async (
             int? milestoneId,
@@ -115,8 +112,7 @@ public static class DashboardEndpoints
                 result.Count);
             return Results.Ok(result);
         })
-            .WithName("GetGantt")
-            .WithOpenApi();
+            .WithName("GetGantt");
 
         return app;
     }
