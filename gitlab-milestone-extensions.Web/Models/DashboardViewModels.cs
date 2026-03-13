@@ -3,6 +3,7 @@ namespace gitlab_milestone_extensions.Web.Models;
 public sealed record MilestoneDashboardViewModel(
     int MilestoneId,
     string MilestoneTitle,
+    string? MilestoneWebUrl,
     int TotalIssues,
     int OpenIssues,
     int ClosedIssues,
@@ -15,8 +16,10 @@ public sealed record MilestoneDashboardViewModel(
 public sealed record IssueViewModel(
     int Id,
     string Title,
+    string? IssueUrl,
     string ProjectName,
     int ProjectId,
+    string? ProjectUrl,
     int? MilestoneId,
     string Milestone,
     int? AssigneeId,
@@ -32,7 +35,7 @@ public sealed record GanttItemViewModel(
     int Id,
     string Title,
     string ViewMode,
-    string Owner,
+    string Assignee,
     DateOnly StartDate,
     DateOnly EndDate,
     int Progress,

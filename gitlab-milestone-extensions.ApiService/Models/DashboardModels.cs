@@ -19,6 +19,7 @@ public sealed record SummaryDto(
 public sealed record MilestoneDashboardDto(
     int MilestoneId,
     string MilestoneTitle,
+    string? MilestoneWebUrl,
     int TotalIssues,
     int OpenIssues,
     int ClosedIssues,
@@ -67,9 +68,11 @@ public sealed record SelectionOptionsDto(
 public sealed record DashboardIssue(
     string ProjectName,
     int ProjectId,
+    string? ProjectUrl,
     int? MilestoneId,
     string MilestoneTitle,
     string Title,
+    string? IssueUrl,
     string State,
     int? AssigneeId,
     string AssigneeName,
@@ -130,7 +133,7 @@ public sealed record GanttItemDto(
     int Id,
     string Title,
     string ViewMode,
-    string Owner,
+    string Assignee,
     DateOnly StartDate,
     DateOnly EndDate,
     int Progress,

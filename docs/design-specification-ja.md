@@ -183,6 +183,7 @@ gitlab-milestone-extensions/
 
 集計項目:
 
+- `MilestoneWebUrl`
 - `TotalIssues`
 - `OpenIssues`
 - `ClosedIssues`
@@ -204,6 +205,12 @@ gitlab-milestone-extensions/
 
 - `milestoneId` 未指定時は空配列を返却
 - 指定時は `DashboardIssue[]`
+
+返却項目補足:
+
+- `IssueUrl`
+- `ProjectUrl`
+- 画面表示 ID には GitLab issue の `iid` を使用する
 
 #### 8.3.4 GET `/api/gantt`
 
@@ -254,6 +261,8 @@ GitLab 接続確認用 API。`groups` API の結果をそのまま返す。
   - `groups/{groupId}/projects?include_subgroups=true`
   - `projects?membership=true&simple=true`
 - 結果は `Id` で重複排除する
+- project / group / issue の `web_url` を内部 DTO へ引き継ぐ
+- project milestone URL は `project.web_url` と milestone の `iid` から構築する
 
 呼び出し対象 API:
 
@@ -269,6 +278,11 @@ Issue 取得仕様:
 - 担当者は `assignee` を優先し、無い場合 `assignees` の先頭を使用する
 - 工数は `time_stats` を使用する
 - 画面用 ID には `iid` を引き継ぐ
+
+Milestone 取得仕様:
+
+- project milestone は GitLab milestone API の `iid` を保持する
+- group milestone URL は snapshot 構築時に group `web_url` から補完する
 
 #### 8.4.2 `CachedGitLabDataSnapshotService`
 
@@ -288,6 +302,7 @@ Issue 取得仕様:
   - グループマイルストーン一覧取得
   - プロジェクト Issue 一覧取得
 - マイルストーンは `Scope + MilestoneId + ProjectId + ProjectName` 単位で重複排除する
+- group milestone には `group.web_url/-/milestones/{milestoneId}` を補完する
 
 スナップショット構造:
 
@@ -340,19 +355,19 @@ Issue 取得仕様:
 
 | モデル | 主な項目 |
 | --- | --- |
-| `GitLabGroupDto` | `GroupId`, `GroupName` |
-| `GitLabProjectDto` | `ProjectId`, `ProjectName` |
-| `GitLabMilestoneDto` | `ProjectId`, `ProjectName`, `MilestoneId`, `Title`, `Scope`, `State`, `StartDate`, `DueDate` |
-| `GitLabIssueDto` | `ProjectId`, `ProjectName`, `IssueId`, `Iid`, `Title`, `State`, `MilestoneId`, `MilestoneTitle`, `AssigneeId`, `AssigneeName`, `DueDate`, 工数系項目 |
+| `GitLabGroupDto` | `GroupId`, `GroupName`, `WebUrl` |
+| `GitLabProjectDto` | `ProjectId`, `ProjectName`, `WebUrl` |
+| `GitLabMilestoneDto` | `ProjectId`, `ProjectName`, `MilestoneId`, `MilestoneIid`, `Title`, `Scope`, `State`, `StartDate`, `DueDate`, `WebUrl` |
+| `GitLabIssueDto` | `ProjectId`, `ProjectName`, `ProjectWebUrl`, `IssueId`, `Iid`, `Title`, `WebUrl`, `State`, `MilestoneId`, `MilestoneTitle`, `AssigneeId`, `AssigneeName`, `DueDate`, 工数系項目 |
 
 #### 8.5.2 API 返却モデル
 
 | モデル | 用途 |
 | --- | --- |
 | `SelectionOptionsDto` | セレクタ候補一覧 |
-| `MilestoneDashboardDto` | ダッシュボードサマリー |
-| `DashboardIssue` | Issue 表示行 |
-| `GanttItemDto` | Gantt 表示行 |
+| `MilestoneDashboardDto` | ダッシュボードサマリー。`MilestoneWebUrl` を含む |
+| `DashboardIssue` | Issue 表示行。`IssueUrl` と `ProjectUrl` を含む |
+| `GanttItemDto` | Gantt 表示行。担当者表示は `Assignee` |
 
 `MilestoneDashboardDto` の算出式:
 
@@ -416,6 +431,7 @@ Issue 取得仕様:
 通知方式:
 
 - 値変更時に `Changed` イベントを発火する
+- `Dashboard` ページでは active tab index を保持し、selector 変更による再読み込み後もタブ位置を維持する
 
 ### 9.5 Dashboard 画面仕様
 
@@ -432,6 +448,8 @@ Issue 取得仕様:
 
 表示項目:
 
+- 画面上部に milestone 名を表示する
+- milestone 名に対応する GitLab milestone URL が存在する場合はリンク表示する
 - `Total Issues`
 - `Open Issues`
 - `Closed Issues`
@@ -440,6 +458,7 @@ Issue 取得仕様:
 - `Due`
 - `Estimate`
 - `Actual`
+- `Estimate / Actual by Member`
 
 #### 9.5.2 Issues タブ
 
@@ -453,13 +472,20 @@ Issue 取得仕様:
 - `Estimate`
 - `Actual`
 
+表示仕様:
+
+- `Title` は対応する GitLab issue URL へのリンク
+- `Project` は対応する GitLab project URL へのリンク
+- タブ内上部に native `select` による `State` フィルタを持つ
+- `State` フィルタは API 再呼び出しではなく画面内絞り込みで実現する
+
 #### 9.5.3 Gantt タブ
 
 表示列:
 
 - `Title`
 - `Mode`
-- `Owner`
+- `Assignee`
 - `Start`
 - `End`
 - `Progress`
@@ -481,6 +507,7 @@ Issue 取得仕様:
 
 - `GetFromJsonAsync` が `null` を返した場合は `InvalidOperationException`
 - `GetDashboardAsync` は `404` 時に `null` となり得る
+- GitLab 画面用リンク URL は API の返却 DTO をそのまま利用し、Web 側で URL 組み立ては行わない
 
 ## 10. 画面遷移・処理フロー
 
@@ -581,6 +608,20 @@ Issue 取得仕様:
 - グループマイルストーンが候補に含まれること
 - プロジェクトマイルストーンが候補に含まれること
 - グループ外プロジェクトのマイルストーンが候補に含まれること
+
+`GitLabApiClientTests`
+
+確認内容:
+
+- project milestone URL が `id` ではなく `iid` を用いて構築されること
+- group milestone URL が snapshot で補完されること
+
+`GitLabDashboardDataServiceTests`
+
+確認内容:
+
+- `MilestoneDashboardDto` に `MilestoneWebUrl` が反映されること
+- `DashboardIssue` に `IssueUrl` / `ProjectUrl` が反映されること
 
 ### 14.2 結合テスト
 

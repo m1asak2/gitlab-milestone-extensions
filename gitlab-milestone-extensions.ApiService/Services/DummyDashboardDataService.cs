@@ -9,12 +9,12 @@ public sealed class DummyDashboardDataService : IDashboardDataService
 {
     private static readonly IReadOnlyList<DashboardIssue> Issues =
     [
-        new DashboardIssue("Dashboard.Api", 10, 201, "MVP Sprint 1", "API endpoint skeleton", "opened", 1, "Alice", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(2)), 7200, 1800, "2h", "30m", 101),
-        new DashboardIssue("Dashboard.Web", 11, 201, "MVP Sprint 1", "Blazor dashboard shell", "opened", 2, "Bob", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(4)), 10800, 3600, "3h", "1h", 102),
-        new DashboardIssue("Dashboard.Web", 11, 201, "MVP Sprint 1", "Milestone progress card", "closed", 3, "Carla", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1)), 5400, 5400, "1h 30m", "1h 30m", 103),
-        new DashboardIssue("Dashboard.Api", 10, 202, "MVP Sprint 2", "Dummy gantt API data", "opened", 1, "Alice", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(6)), 14400, 1800, "4h", "30m", 104),
-        new DashboardIssue("Default Group", 4, 301, "Group Planning", "Cross-project kickoff", "opened", 4, "Dylan", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(3)), 3600, 600, "1h", "10m", 105),
-        new DashboardIssue("Standalone.Tools", 12, 401, "Standalone Milestone", "Non-group project task", "opened", 5, "Eve", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(5)), 5400, 900, "1h 30m", "15m", 106)
+        new DashboardIssue("Dashboard.Api", 10, "https://gitlab.example.local/dashboard/api", 201, "MVP Sprint 1", "API endpoint skeleton", "https://gitlab.example.local/dashboard/api/-/issues/101", "opened", 1, "Alice", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(2)), 7200, 1800, "2h", "30m", 101),
+        new DashboardIssue("Dashboard.Web", 11, "https://gitlab.example.local/dashboard/web", 201, "MVP Sprint 1", "Blazor dashboard shell", "https://gitlab.example.local/dashboard/web/-/issues/102", "opened", 2, "Bob", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(4)), 10800, 3600, "3h", "1h", 102),
+        new DashboardIssue("Dashboard.Web", 11, "https://gitlab.example.local/dashboard/web", 201, "MVP Sprint 1", "Milestone progress card", "https://gitlab.example.local/dashboard/web/-/issues/103", "closed", 3, "Carla", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1)), 5400, 5400, "1h 30m", "1h 30m", 103),
+        new DashboardIssue("Dashboard.Api", 10, "https://gitlab.example.local/dashboard/api", 202, "MVP Sprint 2", "Dummy gantt API data", "https://gitlab.example.local/dashboard/api/-/issues/104", "opened", 1, "Alice", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(6)), 14400, 1800, "4h", "30m", 104),
+        new DashboardIssue("Default Group", 4, "https://gitlab.example.local/groups/default", 301, "Group Planning", "Cross-project kickoff", "https://gitlab.example.local/groups/default/-/issues/105", "opened", 4, "Dylan", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(3)), 3600, 600, "1h", "10m", 105),
+        new DashboardIssue("Standalone.Tools", 12, "https://gitlab.example.local/standalone/tools", 401, "Standalone Milestone", "Non-group project task", "https://gitlab.example.local/standalone/tools/-/issues/106", "opened", 5, "Eve", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(5)), 5400, 900, "1h 30m", "15m", 106)
     ];
 
     private static readonly IReadOnlyList<SelectorGroupDto> Groups =
@@ -117,6 +117,7 @@ public sealed class DummyDashboardDataService : IDashboardDataService
         var dto = new MilestoneDashboardDto(
             MilestoneId: milestoneId,
             MilestoneTitle: milestone.MilestoneTitle,
+            MilestoneWebUrl: $"{Issues.First(i => i.MilestoneId == milestoneId).ProjectUrl}/-/milestones/{milestoneId}",
             TotalIssues: milestoneIssues.Count,
             OpenIssues: milestoneIssues.Count(i => i.State.Equals("opened", StringComparison.OrdinalIgnoreCase)),
             ClosedIssues: milestoneIssues.Count(i => i.State.Equals("closed", StringComparison.OrdinalIgnoreCase)),

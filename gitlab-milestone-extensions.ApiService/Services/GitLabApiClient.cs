@@ -78,7 +78,7 @@ public class GitLabApiClient
             projects.Count);
 
         return projects
-            .Select(p => new GitLabProjectDto(p.Id, p.Name))
+            .Select(p => new GitLabProjectDto(p.Id, p.Name, p.WebUrl))
             .ToList();
     }
 
@@ -94,7 +94,7 @@ public class GitLabApiClient
             stopwatch.ElapsedMilliseconds,
             _groupId);
 
-        return new GitLabGroupDto(group.Id, group.Name);
+        return new GitLabGroupDto(group.Id, group.Name, group.WebUrl);
     }
 
     public async Task<IReadOnlyList<GitLabMilestoneDto>> GetProjectMilestonesAsync(CancellationToken cancellationToken = default)
@@ -119,11 +119,13 @@ public class GitLabApiClient
                 project.ProjectId,
                 project.ProjectName,
                 m.Id,
+                m.Iid,
                 m.Title,
                 "Project",
                 m.State,
                 m.StartDate,
-                m.DueDate));
+                m.DueDate,
+                project.WebUrl is null ? null : $"{project.WebUrl}/-/milestones/{m.Iid}"));
         });
 
         var resultByProject = await Task.WhenAll(milestoneTasks);
@@ -150,11 +152,13 @@ public class GitLabApiClient
                 ProjectId: _groupId,
                 ProjectName: "Group",
                 MilestoneId: m.Id,
+                MilestoneIid: m.Id,
                 Title: m.Title,
                 Scope: "Group",
                 State: m.State,
                 StartDate: m.StartDate,
-                DueDate: m.DueDate))
+                DueDate: m.DueDate,
+                WebUrl: null))
             .ToList();
 
         stopwatch.Stop();
@@ -188,9 +192,11 @@ public class GitLabApiClient
             return issues.Select(i => new GitLabIssueDto(
                 project.ProjectId,
                 project.ProjectName,
+                project.WebUrl,
                 i.Id,
                 i.Iid,
                 i.Title,
+                i.WebUrl,
                 i.State,
                 i.Milestone?.Id,
                 i.Milestone?.Title,
@@ -264,14 +270,17 @@ public class GitLabApiClient
 
     private sealed record GitLabProjectResponse(
         [property: JsonPropertyName("id")] int Id,
-        [property: JsonPropertyName("name")] string Name);
+        [property: JsonPropertyName("name")] string Name,
+        [property: JsonPropertyName("web_url")] string? WebUrl);
 
     private sealed record GitLabGroupResponse(
         [property: JsonPropertyName("id")] int Id,
-        [property: JsonPropertyName("name")] string Name);
+        [property: JsonPropertyName("name")] string Name,
+        [property: JsonPropertyName("web_url")] string? WebUrl);
 
     private sealed record GitLabMilestoneResponse(
         [property: JsonPropertyName("id")] int Id,
+        [property: JsonPropertyName("iid")] int Iid,
         [property: JsonPropertyName("title")] string Title,
         [property: JsonPropertyName("state")] string State,
         [property: JsonPropertyName("start_date")] DateOnly? StartDate,
@@ -281,6 +290,7 @@ public class GitLabApiClient
         [property: JsonPropertyName("id")] int Id,
         [property: JsonPropertyName("iid")] int Iid,
         [property: JsonPropertyName("title")] string Title,
+        [property: JsonPropertyName("web_url")] string? WebUrl,
         [property: JsonPropertyName("state")] string State,
         [property: JsonPropertyName("due_date")] DateOnly? DueDate,
         [property: JsonPropertyName("milestone")] GitLabIssueMilestoneResponse? Milestone,

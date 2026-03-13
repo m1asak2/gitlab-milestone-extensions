@@ -110,6 +110,7 @@ public sealed class GitLabDashboardDataService(IGitLabDataSnapshotService snapsh
         return new MilestoneDashboardDto(
             MilestoneId: milestoneId,
             MilestoneTitle: milestone?.Title ?? issues[0].MilestoneTitle,
+            MilestoneWebUrl: milestone?.WebUrl,
             TotalIssues: issues.Count,
             OpenIssues: issues.Count(i => i.State.Equals("opened", StringComparison.OrdinalIgnoreCase)),
             ClosedIssues: issues.Count(i => i.State.Equals("closed", StringComparison.OrdinalIgnoreCase)),
@@ -149,7 +150,7 @@ public sealed class GitLabDashboardDataService(IGitLabDataSnapshotService snapsh
                     Id: issue.Id == 0 ? index + 1 : issue.Id,
                     Title: issue.Title,
                     ViewMode: "milestone",
-                    Owner: issue.AssigneeName,
+                    Assignee: issue.AssigneeName,
                     StartDate: startDate,
                     EndDate: endDate,
                     Progress: progress,
@@ -167,9 +168,11 @@ public sealed class GitLabDashboardDataService(IGitLabDataSnapshotService snapsh
             .Select(i => new DashboardIssue(
                 ProjectName: i.ProjectName,
                 ProjectId: i.ProjectId,
+                ProjectUrl: i.ProjectWebUrl,
                 MilestoneId: i.MilestoneId,
                 MilestoneTitle: i.MilestoneTitle ?? string.Empty,
                 Title: i.Title,
+                IssueUrl: i.WebUrl,
                 State: i.State,
                 AssigneeId: i.AssigneeId,
                 AssigneeName: i.AssigneeName ?? string.Empty,

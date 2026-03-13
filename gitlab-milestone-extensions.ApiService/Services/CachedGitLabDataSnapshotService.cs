@@ -48,7 +48,12 @@ public sealed class CachedGitLabDataSnapshotService(
 
             var groups = new[] { await groupTask };
             var projectMilestones = await projectMilestonesTask;
-            var groupMilestones = await groupMilestonesTask;
+            var groupMilestones = (await groupMilestonesTask)
+                .Select(m => m with
+                {
+                    WebUrl = groups[0].WebUrl is null ? null : $"{groups[0].WebUrl}/-/milestones/{m.MilestoneId}"
+                })
+                .ToList();
             var milestones = projectMilestones
                 .Concat(groupMilestones)
                 .GroupBy(m => new { m.Scope, m.MilestoneId, m.ProjectId, m.ProjectName })

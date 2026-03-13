@@ -4,9 +4,25 @@
 @inject DashboardApiClient ApiClient
 @inject MilestoneSelectionState SelectionState
 
-<PageTitle>Dashboard</PageTitle>
+<PageTitle>@(_dashboard?.MilestoneTitle ?? "Dashboard")</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-4">Dashboard</MudText>
+@if (_dashboard is { MilestoneTitle: { Length: > 0 } } dashboard)
+{
+    @if (!string.IsNullOrWhiteSpace(dashboard.MilestoneWebUrl))
+    {
+        <MudLink Href="@dashboard.MilestoneWebUrl" Target="_blank" Underline="Underline.Always" Color="Color.Primary" Class="d-inline-block mb-4">
+            <MudText Typo="Typo.h4">@dashboard.MilestoneTitle</MudText>
+        </MudLink>
+    }
+    else
+    {
+        <MudText Typo="Typo.h4" Class="mb-4">@dashboard.MilestoneTitle</MudText>
+    }
+}
+else
+{
+    <MudText Typo="Typo.h4" Class="mb-4">Dashboard</MudText>
+}
 
 @if (_isLoading)
 {
@@ -22,11 +38,8 @@ else if (SelectionState.SelectedMilestoneId is null)
 }
 else
 {
-    <MudTabs>
+    <MudTabs @bind-ActivePanelIndex="_activeTabIndex">
         <MudTabPanel Text="Dashboard">
-            <MudText Typo="Typo.subtitle1" Class="mb-2">
-                Milestone: @(_dashboard?.MilestoneTitle ?? "-")
-            </MudText>
             <MudGrid Class="mb-4 mt-2">
                 <MudItem xs="12" sm="6" lg="3">
                     <MudPaper Class="pa-4">
@@ -80,10 +93,40 @@ else
                     </MudPaper>
                 </MudItem>
             </MudGrid>
+
+            <MudPaper Class="pa-4 mt-4">
+                <MudText Typo="Typo.h6" Class="mb-3">Estimate / Actual by Member</MudText>
+                <MudTable Items="_memberWorkloads" Dense="true">
+                    <HeaderContent>
+                        <MudTh>Member</MudTh>
+                        <MudTh>Estimate</MudTh>
+                        <MudTh>Actual</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Member">@context.MemberName</MudTd>
+                        <MudTd DataLabel="Estimate">@FormatSeconds(context.EstimateSeconds)</MudTd>
+                        <MudTd DataLabel="Actual">@FormatSeconds(context.ActualSeconds)</MudTd>
+                    </RowTemplate>
+                </MudTable>
+            </MudPaper>
         </MudTabPanel>
 
         <MudTabPanel Text="Issues">
-            <MudTable Items="_issues">
+            <div class="mb-3 issue-filter">
+                <label class="selector-label" for="issue-state-select">State</label>
+                <select id="issue-state-select"
+                        class="selector-input"
+                        value="@_issueStateFilter"
+                        @onchange="OnIssueStateFilterChanged">
+                    <option value="@AllStatesValue">All</option>
+                    @foreach (var state in _issueStates)
+                    {
+                        <option value="@state">@state</option>
+                    }
+                </select>
+            </div>
+
+            <MudTable Items="_filteredIssues">
                 <HeaderContent>
                     <MudTh>Id</MudTh>
                     <MudTh>Title</MudTh>
@@ -95,40 +138,60 @@ else
                 </HeaderContent>
                 <RowTemplate>
                     <MudTd DataLabel="Id">@context.Id</MudTd>
-                    <MudTd DataLabel="Title">@context.Title</MudTd>
-                    <MudTd DataLabel="Project">@context.ProjectName</MudTd>
+                    <MudTd DataLabel="Title">
+                        @if (!string.IsNullOrWhiteSpace(context.IssueUrl))
+                        {
+                            <MudLink Href="@context.IssueUrl" Target="_blank">@context.Title</MudLink>
+                        }
+                        else
+                        {
+                            @context.Title
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Project">
+                        @if (!string.IsNullOrWhiteSpace(context.ProjectUrl))
+                        {
+                            <MudLink Href="@context.ProjectUrl" Target="_blank">@context.ProjectName</MudLink>
+                        }
+                        else
+                        {
+                            @context.ProjectName
+                        }
+                    </MudTd>
                     <MudTd DataLabel="Assignee">@context.Assignee</MudTd>
                     <MudTd DataLabel="State">@context.State</MudTd>
-                    <MudTd DataLabel="Estimate">@FormatIssueDuration(context.HumanTimeEstimate, context.TimeEstimateSeconds)</MudTd>
-                    <MudTd DataLabel="Actual">@FormatIssueDuration(context.HumanTotalTimeSpent, context.TotalTimeSpentSeconds)</MudTd>
-                </RowTemplate>
-            </MudTable>
-        </MudTabPanel>
-
-        <MudTabPanel Text="Gantt">
-            <MudTable Items="_ganttItems">
-                <HeaderContent>
-                    <MudTh>Title</MudTh>
-                    <MudTh>Mode</MudTh>
-                    <MudTh>Owner</MudTh>
-                    <MudTh>Start</MudTh>
-                    <MudTh>End</MudTh>
-                    <MudTh>Progress</MudTh>
-                </HeaderContent>
-                <RowTemplate>
-                    <MudTd DataLabel="Title">@context.Title</MudTd>
-                    <MudTd DataLabel="Mode">@context.ViewMode</MudTd>
-                    <MudTd DataLabel="Owner">@context.Owner</MudTd>
-                    <MudTd DataLabel="Start">@context.StartDate.ToString("yyyy-MM-dd")</MudTd>
-                    <MudTd DataLabel="End">@context.EndDate.ToString("yyyy-MM-dd")</MudTd>
-                    <MudTd DataLabel="Progress">
-                        <MudProgressLinear Color="Color.Secondary" Value="@context.Progress" />
+                    <MudTd DataLabel="Estimate">@FormatIssueDuration(context.HumanTimeEstimate, context.TimeEstimateSeconds)
                     </MudTd>
-                </RowTemplate>
-            </MudTable>
-        </MudTabPanel>
-    </MudTabs>
-}
+                    <MudTd DataLabel="Actual">@FormatIssueDuration(context.HumanTotalTimeSpent,
+                                            context.TotalTimeSpentSeconds)</MudTd>
+                    </RowTemplate>
+                </MudTable>
+            </MudTabPanel>
+
+            <MudTabPanel Text="Gantt">
+                <MudTable Items="_ganttItems">
+                    <HeaderContent>
+                        <MudTh>Title</MudTh>
+                        <MudTh>Mode</MudTh>
+                        <MudTh>Assignee</MudTh>
+                        <MudTh>Start</MudTh>
+                        <MudTh>End</MudTh>
+                        <MudTh>Progress</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Title">@context.Title</MudTd>
+                        <MudTd DataLabel="Mode">@context.ViewMode</MudTd>
+                        <MudTd DataLabel="Assignee">@context.Assignee</MudTd>
+                        <MudTd DataLabel="Start">@context.StartDate.ToString("yyyy-MM-dd")</MudTd>
+                        <MudTd DataLabel="End">@context.EndDate.ToString("yyyy-MM-dd")</MudTd>
+                        <MudTd DataLabel="Progress">
+                            <MudProgressLinear Color="Color.Secondary" Value="@context.Progress" />
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            </MudTabPanel>
+        </MudTabs>
+    }
 
 @code {
     private bool _isLoading;
@@ -136,6 +199,13 @@ else
     private MilestoneDashboardViewModel? _dashboard;
     private IReadOnlyList<IssueViewModel> _issues = [];
     private IReadOnlyList<GanttItemViewModel> _ganttItems = [];
+    private IReadOnlyList<MemberWorkloadViewModel> _memberWorkloads = [];
+    private IReadOnlyList<IssueViewModel> _filteredIssues = [];
+    private IReadOnlyList<string> _issueStates = [];
+    private int _activeTabIndex;
+    private string _issueStateFilter = AllStatesValue;
+
+    private const string AllStatesValue = "__all__";
 
     protected override async Task OnInitializedAsync()
     {
@@ -163,6 +233,10 @@ else
             _dashboard = null;
             _issues = [];
             _ganttItems = [];
+            _memberWorkloads = [];
+            _filteredIssues = [];
+            _issueStates = [];
+            _issueStateFilter = AllStatesValue;
             _isLoading = false;
             StateHasChanged();
             return;
@@ -176,6 +250,20 @@ else
             _dashboard = await ApiClient.GetDashboardAsync(milestoneId.Value);
             _issues = await ApiClient.GetIssuesAsync(milestoneId.Value);
             _ganttItems = await ApiClient.GetGanttAsync(milestoneId.Value);
+            _memberWorkloads = BuildMemberWorkloads(_issues);
+            _issueStates = _issues
+                .Select(issue => issue.State)
+                .Where(state => !string.IsNullOrWhiteSpace(state))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(state => state, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (_issueStateFilter != AllStatesValue && !_issueStates.Contains(_issueStateFilter, StringComparer.OrdinalIgnoreCase))
+            {
+                _issueStateFilter = AllStatesValue;
+            }
+
+            ApplyIssueFilter();
         }
         catch (Exception ex)
         {
@@ -183,6 +271,9 @@ else
             _dashboard = null;
             _issues = [];
             _ganttItems = [];
+            _memberWorkloads = [];
+            _filteredIssues = [];
+            _issueStates = [];
         }
         finally
         {
@@ -225,4 +316,37 @@ else
 
         return $"{minutes}m";
     }
+
+    private void OnIssueStateFilterChanged(ChangeEventArgs args)
+    {
+        _issueStateFilter = args.Value?.ToString() ?? AllStatesValue;
+        ApplyIssueFilter();
+    }
+
+    private void ApplyIssueFilter()
+    {
+        _filteredIssues = _issueStateFilter == AllStatesValue
+            ? _issues
+            : _issues
+                .Where(issue => issue.State.Equals(_issueStateFilter, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+    }
+
+    private static IReadOnlyList<MemberWorkloadViewModel> BuildMemberWorkloads(IReadOnlyList<IssueViewModel> issues)
+    {
+        return issues
+            .GroupBy(issue => string.IsNullOrWhiteSpace(issue.Assignee) ? "Unassigned" : issue.Assignee)
+            .Select(group => new MemberWorkloadViewModel(
+                group.Key,
+                group.Sum(issue => issue.TimeEstimateSeconds),
+                group.Sum(issue => issue.TotalTimeSpentSeconds)))
+            .OrderByDescending(item => item.EstimateSeconds)
+            .ThenBy(item => item.MemberName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private sealed record MemberWorkloadViewModel(
+        string MemberName,
+        int EstimateSeconds,
+        int ActualSeconds);
 }
