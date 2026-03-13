@@ -20,10 +20,23 @@ public sealed class MilestoneSelectionState
         }
 
         PrivateToken = normalizedToken;
-        SelectedGroupId = null;
-        SelectedMemberId = null;
-        SelectedProjectId = null;
-        SelectedMilestoneId = null;
+        Changed?.Invoke();
+    }
+
+    public void SetSelection(int? groupId, int? memberId, int? projectId, int? milestoneId)
+    {
+        if (SelectedGroupId == groupId &&
+            SelectedMemberId == memberId &&
+            SelectedProjectId == projectId &&
+            SelectedMilestoneId == milestoneId)
+        {
+            return;
+        }
+
+        SelectedGroupId = groupId;
+        SelectedMemberId = memberId;
+        SelectedProjectId = projectId;
+        SelectedMilestoneId = milestoneId;
         Changed?.Invoke();
     }
 

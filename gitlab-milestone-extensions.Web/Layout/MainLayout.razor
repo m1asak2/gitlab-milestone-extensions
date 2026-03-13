@@ -1,6 +1,7 @@
 @inherits LayoutComponentBase
 @implements IDisposable
 @inject DashboardApiClient ApiClient
+@inject NavigationManager NavigationManager
 @inject MilestoneSelectionState SelectionState
 @inject PrivateTokenStorage PrivateTokenStorage
 
@@ -21,7 +22,7 @@
                 Change Token
             </MudButton>
         }
-        <MudButton Variant="Variant.Outlined" Color="Color.Inherit" StartIcon="@Icons.Material.Filled.Refresh" Href="/dashboard">
+        <MudButton Variant="Variant.Outlined" Color="Color.Inherit" StartIcon="@Icons.Material.Filled.Refresh" Href="@NavigationManager.Uri">
             Refresh
         </MudButton>
     </MudAppBar>
@@ -132,6 +133,8 @@
 @code {
     private bool _isLoadingSelectors;
     private bool _isTokenEditorVisible = true;
+    private bool _isApplyingSelectionFromUrl;
+    private bool _isUpdatingUrlFromSelection;
     private string? _selectorError;
     private string? _privateTokenInput;
     private GitLabCurrentUserViewModel? _currentGitLabUser;
@@ -149,6 +152,8 @@
     protected override async Task OnInitializedAsync()
     {
         SelectionState.Changed += OnSelectionStateChanged;
+        NavigationManager.LocationChanged += OnLocationChanged;
+        ApplySelectionFromUrl(NavigationManager.Uri);
         var rememberedToken = await PrivateTokenStorage.GetAsync();
         _privateTokenInput = rememberedToken;
         await InitializeTokenAsync(rememberedToken, saveIfValid: false);
@@ -157,6 +162,7 @@
     public void Dispose()
     {
         SelectionState.Changed -= OnSelectionStateChanged;
+        NavigationManager.LocationChanged -= OnLocationChanged;
     }
 
     private async Task OnGroupChanged(ChangeEventArgs args)
@@ -209,7 +215,31 @@
         _selectedMemberId = SelectionState.SelectedMemberId;
         _selectedProjectId = SelectionState.SelectedProjectId;
         _selectedMilestoneId = SelectionState.SelectedMilestoneId;
+        if (!_isApplyingSelectionFromUrl)
+        {
+            SyncUrlWithSelection();
+        }
+
         InvokeAsync(StateHasChanged);
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        if (_isUpdatingUrlFromSelection)
+        {
+            return;
+        }
+
+        ApplySelectionFromUrl(args.Location);
+        _ = InvokeAsync(async () =>
+        {
+            if (SelectionState.HasPrivateToken)
+            {
+                await LoadSelectionOptionsAsync();
+            }
+
+            StateHasChanged();
+        });
     }
 
     private async Task LoadSelectionOptionsAsync()
@@ -348,9 +378,101 @@
         }
     }
 
+    private void ApplySelectionFromUrl(string uriString)
+    {
+        var uri = NavigationManager.ToAbsoluteUri(uriString);
+        var query = ParseQuery(uri.Query);
+        var groupId = ParseNullableInt(query, "groupId");
+        var memberId = ParseNullableInt(query, "memberId");
+        var projectId = ParseNullableInt(query, "projectId");
+        var milestoneId = ParseNullableInt(query, "milestoneId");
+
+        _isApplyingSelectionFromUrl = true;
+        try
+        {
+            SelectionState.SetSelection(groupId, memberId, projectId, milestoneId);
+        }
+        finally
+        {
+            _isApplyingSelectionFromUrl = false;
+        }
+    }
+
+    private void SyncUrlWithSelection()
+    {
+        var currentUri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        var path = currentUri.GetLeftPart(UriPartial.Path);
+        var query = new Dictionary<string, string>();
+
+        if (SelectionState.SelectedGroupId.HasValue)
+        {
+            query["groupId"] = SelectionState.SelectedGroupId.Value.ToString();
+        }
+
+        if (SelectionState.SelectedMemberId.HasValue)
+        {
+            query["memberId"] = SelectionState.SelectedMemberId.Value.ToString();
+        }
+
+        if (SelectionState.SelectedProjectId.HasValue)
+        {
+            query["projectId"] = SelectionState.SelectedProjectId.Value.ToString();
+        }
+
+        if (SelectionState.SelectedMilestoneId.HasValue)
+        {
+            query["milestoneId"] = SelectionState.SelectedMilestoneId.Value.ToString();
+        }
+
+        var targetUri = query.Count == 0
+            ? path
+            : $"{path}?{string.Join("&", query.Select(kvp => $"{Uri.EscapeDataString(kvp.Key)}={Uri.EscapeDataString(kvp.Value)}"))}";
+
+        if (string.Equals(targetUri, NavigationManager.Uri, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _isUpdatingUrlFromSelection = true;
+        try
+        {
+            NavigationManager.NavigateTo(targetUri, replace: true);
+        }
+        finally
+        {
+            _isUpdatingUrlFromSelection = false;
+        }
+    }
+
     private static int? ParseNullableInt(ChangeEventArgs args)
     {
         var raw = args.Value?.ToString();
         return int.TryParse(raw, out var value) ? value : null;
+    }
+
+    private static Dictionary<string, string> ParseQuery(string queryString)
+    {
+        var query = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (string.IsNullOrWhiteSpace(queryString))
+        {
+            return query;
+        }
+
+        foreach (var segment in queryString.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var parts = segment.Split('=', 2);
+            var key = Uri.UnescapeDataString(parts[0]);
+            var value = parts.Length > 1 ? Uri.UnescapeDataString(parts[1]) : string.Empty;
+            query[key] = value;
+        }
+
+        return query;
+    }
+
+    private static int? ParseNullableInt(Dictionary<string, string> query, string key)
+    {
+        return query.TryGetValue(key, out var value) && int.TryParse(value, out var parsed)
+            ? parsed
+            : null;
     }
 }
