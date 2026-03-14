@@ -75,15 +75,11 @@ public sealed class GitLabDashboardDataService(IGitLabDataSnapshotService snapsh
             .OrderBy(p => p.ProjectName)
             .ToList();
 
-        var milestoneIds = memberId.HasValue || projectId.HasValue
-            ? FilterIssues(memberId, projectId, null)
-                .Where(i => i.MilestoneId.HasValue)
-                .Select(i => i.MilestoneId!.Value)
-                .Distinct()
-                .ToHashSet()
-            : null;
         var milestones = snapshot.Milestones
-            .Where(m => milestoneIds is null || milestoneIds.Contains(m.MilestoneId))
+            .Where(m => !projectId.HasValue || m.ProjectId == projectId.Value)
+            .Where(m => !memberId.HasValue || issues.Any(issue =>
+                issue.AssigneeId == memberId.Value &&
+                issue.MilestoneId == m.MilestoneId))
             .GroupBy(m => m.MilestoneId)
             .Select(g => g.First())
             .Select(m => new SelectorMilestoneDto(

@@ -50,9 +50,7 @@ public sealed class CachedGitLabDataSnapshotService(
             }
 
             var fetchStopwatch = Stopwatch.StartNew();
-            Task<GitLabGroupDto?> groupTask = groupId.HasValue
-                ? gitLabApiClient.GetGroupAsync(groupId.Value, cancellationToken)
-                : Task.FromResult<GitLabGroupDto?>(null);
+            var groupTask = GetGroupOrDefaultAsync(groupId, cancellationToken);
             var projects = await gitLabApiClient.GetProjectsAsync(groupId, cancellationToken);
             var projectMilestonesTask = gitLabApiClient.GetProjectMilestonesAsync(projects, cancellationToken);
             var groupMilestonesTask = gitLabApiClient.GetGroupMilestonesAsync(groupId, cancellationToken);
@@ -122,5 +120,15 @@ public sealed class CachedGitLabDataSnapshotService(
     {
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(privateToken));
         return Convert.ToHexString(bytes);
+    }
+
+    private async Task<GitLabGroupDto?> GetGroupOrDefaultAsync(int? groupId, CancellationToken cancellationToken)
+    {
+        if (!groupId.HasValue)
+        {
+            return null;
+        }
+
+        return await gitLabApiClient.GetGroupAsync(groupId.Value, cancellationToken);
     }
 }

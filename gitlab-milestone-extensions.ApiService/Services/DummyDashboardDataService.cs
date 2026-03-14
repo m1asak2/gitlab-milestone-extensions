@@ -51,12 +51,23 @@ public sealed class DummyDashboardDataService : IDashboardDataService
             return Task.FromResult(new SelectionOptionsDto(Groups, [], [], []));
         }
 
+        var availableProjects = groupId.HasValue
+            ? Projects.Where(project => project.ProjectId is 10 or 11).ToList()
+            : Projects;
+        var availableMilestones = groupId.HasValue
+            ? Milestones.Where(milestone => milestone.ProjectId is 4 or 10 or 11).ToList()
+            : Milestones;
+
         IEnumerable<DashboardIssue> FilterIssues(
             int? selectedMemberId,
             int? selectedProjectId,
             int? selectedMilestoneId)
         {
-            var scoped = Issues.AsEnumerable();
+            var allowedProjectIds = availableProjects.Select(project => project.ProjectId).ToHashSet();
+            var allowedMilestoneIds = availableMilestones.Select(milestone => milestone.MilestoneId).ToHashSet();
+            var scoped = Issues
+                .Where(issue => allowedProjectIds.Contains(issue.ProjectId))
+                .Where(issue => !issue.MilestoneId.HasValue || allowedMilestoneIds.Contains(issue.MilestoneId.Value));
             if (selectedMemberId.HasValue)
             {
                 scoped = scoped.Where(i => i.AssigneeId == selectedMemberId.Value);
@@ -86,16 +97,13 @@ public sealed class DummyDashboardDataService : IDashboardDataService
             .Select(i => i.ProjectId)
             .Distinct()
             .ToHashSet();
-        var scopedProjects = Projects.Where(p => scopedProjectIds.Contains(p.ProjectId)).ToList();
+        var scopedProjects = availableProjects.Where(p => scopedProjectIds.Contains(p.ProjectId)).ToList();
 
-        var scopedMilestoneIds = FilterIssues(memberId, projectId, null)
-            .Where(i => i.MilestoneId.HasValue)
-            .Select(i => i.MilestoneId!.Value)
-            .Distinct()
-            .ToHashSet();
-
-        var scopedMilestones = Milestones
-            .Where(m => scopedMilestoneIds.Contains(m.MilestoneId))
+        var scopedMilestones = availableMilestones
+            .Where(m => !projectId.HasValue || m.ProjectId == projectId.Value)
+            .Where(m => !memberId.HasValue || Issues.Any(issue =>
+                issue.AssigneeId == memberId.Value &&
+                issue.MilestoneId == m.MilestoneId))
             .ToList();
 
         return Task.FromResult(new SelectionOptionsDto(Groups, members, scopedProjects, scopedMilestones));

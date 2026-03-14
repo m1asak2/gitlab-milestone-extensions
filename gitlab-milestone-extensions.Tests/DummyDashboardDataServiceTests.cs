@@ -18,6 +18,9 @@ public sealed class DummyDashboardDataServiceTests
 
         Assert.NotEmpty(options.Groups);
         Assert.NotEmpty(options.Projects);
+        Assert.Contains(options.Projects, p => p.ProjectName == "Standalone.Tools");
+        Assert.Contains(options.Milestones, m => m.ProjectName == "Default Group");
+        Assert.Contains(options.Milestones, m => m.ProjectName == "Standalone.Tools");
     }
 
     [Fact]
@@ -33,6 +36,7 @@ public sealed class DummyDashboardDataServiceTests
             cancellationToken: CancellationToken.None);
 
         Assert.Contains(options.Milestones, m => m.ProjectId == 4 && m.ProjectName == "Default Group");
+        Assert.DoesNotContain(options.Milestones, m => m.ProjectName == "Standalone.Tools");
     }
 
     [Fact]
@@ -48,8 +52,24 @@ public sealed class DummyDashboardDataServiceTests
             cancellationToken: CancellationToken.None);
 
         Assert.Contains(options.Milestones, m =>
-            m.ProjectId == 12 &&
-            m.ProjectName == "Standalone.Tools" &&
-            m.MilestoneTitle == "Standalone Milestone");
+            m.ProjectId == 10 &&
+            m.ProjectName == "Dashboard.Api" &&
+            m.MilestoneTitle == "MVP Sprint 1");
+    }
+
+    [Fact]
+    public async Task GetSelectionOptionsAsync_WithProjectSelection_FiltersMilestonesByProject()
+    {
+        var service = new DummyDashboardDataService();
+
+        var options = await service.GetSelectionOptionsAsync(
+            groupId: 4,
+            memberId: null,
+            projectId: 10,
+            milestoneId: null,
+            cancellationToken: CancellationToken.None);
+
+        Assert.All(options.Milestones, milestone => Assert.Equal(10, milestone.ProjectId));
+        Assert.DoesNotContain(options.Milestones, milestone => milestone.ProjectId == 4);
     }
 }
