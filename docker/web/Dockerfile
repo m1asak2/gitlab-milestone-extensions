@@ -9,7 +9,7 @@ COPY gitlab-milestone-extensions.Web/ gitlab-milestone-extensions.Web/
 
 RUN dotnet publish gitlab-milestone-extensions.Web/gitlab-milestone-extensions.Web.csproj -c Release -o /app/publish
 
-FROM nginx:1.27-alpine AS final
+FROM nginxinc/nginx-unprivileged:1.27-alpine AS final
 
 COPY docker/web/nginx/default.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/publish/wwwroot /usr/share/nginx/html

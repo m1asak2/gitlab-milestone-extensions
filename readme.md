@@ -84,3 +84,7 @@ https://localhost:7364/scalar/v1
 ## Docker
 
 Docker 構成と運用方針は `docs/docker-deployment.md` を参照してください。
+
+## OpenShift
+
+OpenShift への移行方針とサンプル manifest は `docs/openshift-deployment.md` を参照してください。
