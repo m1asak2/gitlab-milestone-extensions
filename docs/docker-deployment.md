@@ -76,6 +76,8 @@ docker/
 
 現在の実装では、GitLab private token はブラウザから `X-GitLab-Private-Token` ヘッダで API へ送信されます。トークンの保存先は Web 側の local storage です。
 
+ローカルの `docker-compose` で `http://gitlab.local` を利用する場合、`api` サービスには `gitlab.local:host-gateway` の `extra_hosts` を設定し、Docker コンテナからホスト側 GitLab に到達できるようにします。
+
 ## nginx Routing Policy
 
 `docker/web/nginx/default.conf` の責務は次の 2 つです。
