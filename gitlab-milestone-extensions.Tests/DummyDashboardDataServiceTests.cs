@@ -5,7 +5,7 @@ namespace gitlab_milestone_extensions.Tests;
 public sealed class DummyDashboardDataServiceTests
 {
     [Fact]
-    public async Task GetSelectionOptionsAsync_WithoutGroupSelection_ReturnsGroupsOnly()
+    public async Task GetSelectionOptionsAsync_WithoutGroupSelection_ReturnsProjectsForDirectSelection()
     {
         var service = new DummyDashboardDataService();
 
@@ -17,9 +17,7 @@ public sealed class DummyDashboardDataServiceTests
             cancellationToken: CancellationToken.None);
 
         Assert.NotEmpty(options.Groups);
-        Assert.Empty(options.Members);
-        Assert.Empty(options.Projects);
-        Assert.Empty(options.Milestones);
+        Assert.NotEmpty(options.Projects);
     }
 
     [Fact]

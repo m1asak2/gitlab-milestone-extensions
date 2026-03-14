@@ -14,9 +14,9 @@ public interface IDashboardDataService
         int? milestoneId,
         CancellationToken cancellationToken);
 
-    Task<MilestoneDashboardDto?> GetDashboardAsync(int groupId, int milestoneId, CancellationToken cancellationToken);
+    Task<MilestoneDashboardDto?> GetDashboardAsync(int? groupId, int milestoneId, CancellationToken cancellationToken);
 
-    Task<IReadOnlyList<DashboardIssue>> GetIssuesAsync(int groupId, int milestoneId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<DashboardIssue>> GetIssuesAsync(int? groupId, int milestoneId, CancellationToken cancellationToken);
 
-    Task<IReadOnlyList<GanttItemDto>> GetGanttAsync(int groupId, int milestoneId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<GanttItemDto>> GetGanttAsync(int? groupId, int milestoneId, CancellationToken cancellationToken);
 }

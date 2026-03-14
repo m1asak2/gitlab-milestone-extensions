@@ -49,11 +49,6 @@ public static class DashboardEndpoints
             ILoggerFactory loggerFactory,
             CancellationToken cancellationToken) =>
         {
-            if (!groupId.HasValue)
-            {
-                return Results.BadRequest("groupId is required.");
-            }
-
             if (!milestoneId.HasValue)
             {
                 return Results.BadRequest("milestoneId is required.");
@@ -61,12 +56,12 @@ public static class DashboardEndpoints
 
             var logger = loggerFactory.CreateLogger("DashboardEndpoints");
             var stopwatch = Stopwatch.StartNew();
-            var result = await service.GetDashboardAsync(groupId.Value, milestoneId.Value, cancellationToken);
+            var result = await service.GetDashboardAsync(groupId, milestoneId.Value, cancellationToken);
             stopwatch.Stop();
             logger.LogInformation(
                 "GET /api/dashboard completed in {ElapsedMs}ms. groupId={GroupId}, milestoneId={MilestoneId}",
                 stopwatch.ElapsedMilliseconds,
-                groupId.Value,
+                groupId?.ToString() ?? "(none)",
                 milestoneId.Value);
 
             return result is null ? Results.NotFound() : Results.Ok(result);
@@ -85,19 +80,14 @@ public static class DashboardEndpoints
                 return Results.Ok(Array.Empty<DashboardIssue>());
             }
 
-            if (!groupId.HasValue)
-            {
-                return Results.BadRequest("groupId is required.");
-            }
-
             var logger = loggerFactory.CreateLogger("DashboardEndpoints");
             var stopwatch = Stopwatch.StartNew();
-            var result = await service.GetIssuesAsync(groupId.Value, milestoneId.Value, cancellationToken);
+            var result = await service.GetIssuesAsync(groupId, milestoneId.Value, cancellationToken);
             stopwatch.Stop();
             logger.LogInformation(
                 "GET /api/issues completed in {ElapsedMs}ms. groupId={GroupId}, milestoneId={MilestoneId}. Count={Count}",
                 stopwatch.ElapsedMilliseconds,
-                groupId.Value,
+                groupId?.ToString() ?? "(none)",
                 milestoneId.Value,
                 result.Count);
             return Results.Ok(result);
@@ -116,19 +106,14 @@ public static class DashboardEndpoints
                 return Results.Ok(Array.Empty<GanttItemDto>());
             }
 
-            if (!groupId.HasValue)
-            {
-                return Results.BadRequest("groupId is required.");
-            }
-
             var logger = loggerFactory.CreateLogger("DashboardEndpoints");
             var stopwatch = Stopwatch.StartNew();
-            var result = await service.GetGanttAsync(groupId.Value, milestoneId.Value, cancellationToken);
+            var result = await service.GetGanttAsync(groupId, milestoneId.Value, cancellationToken);
             stopwatch.Stop();
             logger.LogInformation(
                 "GET /api/gantt completed in {ElapsedMs}ms. groupId={GroupId}, milestoneId={MilestoneId}. Count={Count}",
                 stopwatch.ElapsedMilliseconds,
-                groupId.Value,
+                groupId?.ToString() ?? "(none)",
                 milestoneId.Value,
                 result.Count);
             return Results.Ok(result);

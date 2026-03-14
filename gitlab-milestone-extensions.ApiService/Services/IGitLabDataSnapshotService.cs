@@ -6,7 +6,7 @@ public interface IGitLabDataSnapshotService
 {
     Task<IReadOnlyList<GitLabGroupDto>> GetAccessibleGroupsAsync(CancellationToken cancellationToken);
 
-    Task<GitLabDataSnapshot> GetSnapshotAsync(int groupId, CancellationToken cancellationToken);
+    Task<GitLabDataSnapshot> GetSnapshotAsync(int? groupId, CancellationToken cancellationToken);
 }
 
 public sealed record GitLabDataSnapshot(

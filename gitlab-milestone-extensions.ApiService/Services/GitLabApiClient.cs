@@ -83,19 +83,27 @@ public class GitLabApiClient
         return result;
     }
 
-    public async Task<IReadOnlyList<GitLabProjectDto>> GetProjectsAsync(int groupId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<GitLabProjectDto>> GetProjectsAsync(int? groupId, CancellationToken cancellationToken = default)
     {
-        ValidateGroupId(groupId);
         var stopwatch = Stopwatch.StartNew();
-        var groupProjectsTask = GetPagedAsync<GitLabProjectResponse>(
-            $"groups/{groupId}/projects?include_subgroups=true",
-            cancellationToken);
         var membershipProjectsTask = GetPagedAsync<GitLabProjectResponse>(
             "projects?membership=true&simple=true",
             cancellationToken);
-        await Task.WhenAll(groupProjectsTask, membershipProjectsTask);
+        Task<List<GitLabProjectResponse>>? groupProjectsTask = null;
+        if (groupId.HasValue)
+        {
+            ValidateGroupId(groupId.Value);
+            groupProjectsTask = GetPagedAsync<GitLabProjectResponse>(
+                $"groups/{groupId.Value}/projects?include_subgroups=true",
+                cancellationToken);
+            await Task.WhenAll(groupProjectsTask, membershipProjectsTask);
+        }
+        else
+        {
+            await membershipProjectsTask;
+        }
 
-        var projects = (await groupProjectsTask)
+        var projects = (groupProjectsTask is null ? [] : await groupProjectsTask)
             .Concat(await membershipProjectsTask)
             .GroupBy(p => p.Id)
             .Select(g => g.First())
@@ -104,7 +112,7 @@ public class GitLabApiClient
         _logger.LogInformation(
             "GitLab projects fetched in {ElapsedMs}ms. GroupId={GroupId}, Count={Count}",
             stopwatch.ElapsedMilliseconds,
-            groupId,
+            groupId?.ToString() ?? "(membership)",
             projects.Count);
 
         return projects
@@ -144,7 +152,7 @@ public class GitLabApiClient
         return new GitLabCurrentUserDto(user.Id, user.Name, user.Username, user.AvatarUrl, user.WebUrl);
     }
 
-    public async Task<IReadOnlyList<GitLabMilestoneDto>> GetProjectMilestonesAsync(int groupId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<GitLabMilestoneDto>> GetProjectMilestonesAsync(int? groupId, CancellationToken cancellationToken = default)
     {
         var projects = await GetProjectsAsync(groupId, cancellationToken);
         return await GetProjectMilestonesAsync(projects, cancellationToken);
@@ -187,17 +195,22 @@ public class GitLabApiClient
         return results;
     }
 
-    public async Task<IReadOnlyList<GitLabMilestoneDto>> GetGroupMilestonesAsync(int groupId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<GitLabMilestoneDto>> GetGroupMilestonesAsync(int? groupId, CancellationToken cancellationToken = default)
     {
-        ValidateGroupId(groupId);
+        if (!groupId.HasValue)
+        {
+            return [];
+        }
+
+        ValidateGroupId(groupId.Value);
         var stopwatch = Stopwatch.StartNew();
         var milestones = await GetPagedAsync<GitLabMilestoneResponse>(
-            $"groups/{groupId}/milestones",
+            $"groups/{groupId.Value}/milestones",
             cancellationToken);
 
         var results = milestones
             .Select(m => new GitLabMilestoneDto(
-                ProjectId: groupId,
+                ProjectId: groupId.Value,
                 ProjectName: "Group",
                 MilestoneId: m.Id,
                 MilestoneIid: m.Id,
@@ -213,13 +226,13 @@ public class GitLabApiClient
         _logger.LogInformation(
             "GitLab group milestones fetched in {ElapsedMs}ms. GroupId={GroupId}, MilestoneCount={MilestoneCount}",
             stopwatch.ElapsedMilliseconds,
-            groupId,
+            groupId.Value,
             results.Count);
 
         return results;
     }
 
-    public async Task<IReadOnlyList<GitLabIssueDto>> GetProjectIssuesAsync(int groupId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<GitLabIssueDto>> GetProjectIssuesAsync(int? groupId, CancellationToken cancellationToken = default)
     {
         var projects = await GetProjectsAsync(groupId, cancellationToken);
         return await GetProjectIssuesAsync(projects, cancellationToken);

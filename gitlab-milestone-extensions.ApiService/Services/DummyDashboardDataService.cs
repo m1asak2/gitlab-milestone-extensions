@@ -46,11 +46,6 @@ public sealed class DummyDashboardDataService : IDashboardDataService
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (!groupId.HasValue)
-        {
-            return Task.FromResult(new SelectionOptionsDto(Groups, [], [], []));
-        }
-
         if (groupId.HasValue && Groups.All(g => g.GroupId != groupId.Value))
         {
             return Task.FromResult(new SelectionOptionsDto(Groups, [], [], []));
@@ -106,14 +101,9 @@ public sealed class DummyDashboardDataService : IDashboardDataService
         return Task.FromResult(new SelectionOptionsDto(Groups, members, scopedProjects, scopedMilestones));
     }
 
-    public Task<MilestoneDashboardDto?> GetDashboardAsync(int groupId, int milestoneId, CancellationToken cancellationToken)
+    public Task<MilestoneDashboardDto?> GetDashboardAsync(int? groupId, int milestoneId, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-
-        if (groupId != 4)
-        {
-            return Task.FromResult<MilestoneDashboardDto?>(null);
-        }
 
         var milestoneIssues = Issues.Where(i => i.MilestoneId == milestoneId).ToList();
         if (milestoneIssues.Count == 0)
@@ -140,25 +130,15 @@ public sealed class DummyDashboardDataService : IDashboardDataService
         return Task.FromResult<MilestoneDashboardDto?>(dto);
     }
 
-    public Task<IReadOnlyList<DashboardIssue>> GetIssuesAsync(int groupId, int milestoneId, CancellationToken cancellationToken)
+    public Task<IReadOnlyList<DashboardIssue>> GetIssuesAsync(int? groupId, int milestoneId, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (groupId != 4)
-        {
-            return Task.FromResult<IReadOnlyList<DashboardIssue>>([]);
-        }
-
         return Task.FromResult<IReadOnlyList<DashboardIssue>>(Issues.Where(i => i.MilestoneId == milestoneId).ToList());
     }
 
-    public Task<IReadOnlyList<GanttItemDto>> GetGanttAsync(int groupId, int milestoneId, CancellationToken cancellationToken)
+    public Task<IReadOnlyList<GanttItemDto>> GetGanttAsync(int? groupId, int milestoneId, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-
-        if (groupId != 4)
-        {
-            return Task.FromResult<IReadOnlyList<GanttItemDto>>([]);
-        }
 
         var items = Issues
             .Where(i => i.MilestoneId == milestoneId)

@@ -49,23 +49,20 @@ public sealed class DashboardApiClient(HttpClient httpClient, MilestoneSelection
 
     public async Task<MilestoneDashboardViewModel?> GetDashboardAsync(int milestoneId, CancellationToken cancellationToken = default)
     {
-        var groupId = GetRequiredSelectedGroupId();
-        var url = $"api/dashboard?groupId={groupId}&milestoneId={milestoneId}";
+        var url = BuildScopedApiUrl("api/dashboard", milestoneId);
         return await GetFromApiAsync<MilestoneDashboardViewModel>(url, cancellationToken);
     }
 
     public async Task<IReadOnlyList<IssueViewModel>> GetIssuesAsync(int milestoneId, CancellationToken cancellationToken = default)
     {
-        var groupId = GetRequiredSelectedGroupId();
-        var url = $"api/issues?groupId={groupId}&milestoneId={milestoneId}";
+        var url = BuildScopedApiUrl("api/issues", milestoneId);
         return await GetFromApiAsync<IReadOnlyList<IssueViewModel>>(url, cancellationToken)
             ?? throw new InvalidOperationException($"Failed to load {url}.");
     }
 
     public async Task<IReadOnlyList<GanttItemViewModel>> GetGanttAsync(int milestoneId, CancellationToken cancellationToken = default)
     {
-        var groupId = GetRequiredSelectedGroupId();
-        var url = $"api/gantt?groupId={groupId}&milestoneId={milestoneId}";
+        var url = BuildScopedApiUrl("api/gantt", milestoneId);
         return await GetFromApiAsync<IReadOnlyList<GanttItemViewModel>>(url, cancellationToken)
             ?? throw new InvalidOperationException($"Failed to load {url}.");
     }
@@ -92,13 +89,15 @@ public sealed class DashboardApiClient(HttpClient httpClient, MilestoneSelection
         return await response.Content.ReadFromJsonAsync<T>(cancellationToken: cancellationToken);
     }
 
-    private int GetRequiredSelectedGroupId()
+    private string BuildScopedApiUrl(string path, int milestoneId)
     {
-        if (!selectionState.SelectedGroupId.HasValue)
+        var query = new List<string>();
+        if (selectionState.SelectedGroupId.HasValue)
         {
-            throw new InvalidOperationException("GitLab group selection is required.");
+            query.Add($"groupId={selectionState.SelectedGroupId.Value}");
         }
 
-        return selectionState.SelectedGroupId.Value;
+        query.Add($"milestoneId={milestoneId}");
+        return $"{path}?{string.Join("&", query)}";
     }
 }

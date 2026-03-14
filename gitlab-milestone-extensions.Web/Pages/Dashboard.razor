@@ -36,10 +36,6 @@ else if (!SelectionState.HasPrivateToken)
 {
     <MudAlert Severity="Severity.Info">GitLab のデータを表示するには、画面上部に Private Token を入力してください。</MudAlert>
 }
-else if (SelectionState.SelectedGroupId is null)
-{
-    <MudAlert Severity="Severity.Info">Group を選択してください。Group 選択後に Member / Project / Milestone が読み込まれます。</MudAlert>
-}
 else if (SelectionState.SelectedMilestoneId is null)
 {
     <MudAlert Severity="Severity.Info">Milestone を選択してください。未選択時は Dashboard / Issues / Gantt のデータは表示されません。</MudAlert>
@@ -293,7 +289,7 @@ else
         }
 
         var milestoneId = SelectionState.SelectedMilestoneId;
-        if (!SelectionState.SelectedGroupId.HasValue || !milestoneId.HasValue)
+        if (!milestoneId.HasValue)
         {
             _dashboard = null;
             _issues = [];
