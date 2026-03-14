@@ -6,7 +6,6 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       GitLab__BaseUrl: ${GITLAB_BASE_URL:-http://gitlab.local}
-      GitLab__GroupId: ${GITLAB_GROUP_ID:-4}
     extra_hosts:
       - "gitlab.local:host-gateway"
     expose:

@@ -17,7 +17,9 @@ public static class GitLabEndpoints
 
         group.MapGet("/projects", async (GitLabApiClient client, CancellationToken cancellationToken) =>
         {
-            var projects = await client.GetProjectsAsync(cancellationToken);
+            var selectedGroupId = (await client.GetAccessibleGroupsAsync(cancellationToken)).FirstOrDefault()?.GroupId
+                ?? throw new InvalidOperationException("No accessible GitLab groups were found for the current token.");
+            var projects = await client.GetProjectsAsync(selectedGroupId, cancellationToken);
             return Results.Ok(projects);
         })
         .WithName("GetGitLabProjects");
@@ -31,14 +33,18 @@ public static class GitLabEndpoints
 
         group.MapGet("/milestones", async (GitLabApiClient client, CancellationToken cancellationToken) =>
         {
-            var milestones = await client.GetProjectMilestonesAsync(cancellationToken);
+            var selectedGroupId = (await client.GetAccessibleGroupsAsync(cancellationToken)).FirstOrDefault()?.GroupId
+                ?? throw new InvalidOperationException("No accessible GitLab groups were found for the current token.");
+            var milestones = await client.GetProjectMilestonesAsync(selectedGroupId, cancellationToken);
             return Results.Ok(milestones);
         })
         .WithName("GetGitLabProjectMilestones");
 
         group.MapGet("/issues", async (GitLabApiClient client, CancellationToken cancellationToken) =>
         {
-            var issues = await client.GetProjectIssuesAsync(cancellationToken);
+            var selectedGroupId = (await client.GetAccessibleGroupsAsync(cancellationToken)).FirstOrDefault()?.GroupId
+                ?? throw new InvalidOperationException("No accessible GitLab groups were found for the current token.");
+            var issues = await client.GetProjectIssuesAsync(selectedGroupId, cancellationToken);
             return Results.Ok(issues);
         })
         .WithName("GetGitLabProjectIssues");

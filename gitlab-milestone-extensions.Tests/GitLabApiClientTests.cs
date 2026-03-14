@@ -115,7 +115,7 @@ public sealed class GitLabApiClientTests
             httpContextAccessor,
             NullLogger<CachedGitLabDataSnapshotService>.Instance);
 
-        var snapshot = await snapshotService.GetSnapshotAsync(CancellationToken.None);
+        var snapshot = await snapshotService.GetSnapshotAsync(4, CancellationToken.None);
 
         var milestone = Assert.Single(snapshot.Milestones);
         Assert.Equal("https://gitlab.example.local/groups/platform/-/milestones/301", milestone.WebUrl);
@@ -126,8 +126,7 @@ public sealed class GitLabApiClientTests
         var httpClient = new HttpClient(handler);
         var options = Options.Create(new GitLabOptions
         {
-            BaseUrl = "https://gitlab.example.local",
-            GroupId = 4
+            BaseUrl = "https://gitlab.example.local"
         });
         httpContextAccessor ??= CreateHttpContextAccessor();
 

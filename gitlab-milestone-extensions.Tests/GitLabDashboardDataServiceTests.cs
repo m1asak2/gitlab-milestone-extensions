@@ -10,7 +10,7 @@ public sealed class GitLabDashboardDataServiceTests
     {
         var service = new GitLabDashboardDataService(new StubSnapshotService(CreateSnapshot()));
 
-        var result = await service.GetDashboardAsync(201, CancellationToken.None);
+        var result = await service.GetDashboardAsync(4, 201, CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Equal("Sprint 1", result.MilestoneTitle);
@@ -25,7 +25,7 @@ public sealed class GitLabDashboardDataServiceTests
     {
         var service = new GitLabDashboardDataService(new StubSnapshotService(CreateSnapshot()));
 
-        var issues = await service.GetIssuesAsync(201, CancellationToken.None);
+        var issues = await service.GetIssuesAsync(4, 201, CancellationToken.None);
 
         Assert.Equal(2, issues.Count);
 
@@ -107,7 +107,13 @@ public sealed class GitLabDashboardDataServiceTests
 
     private sealed class StubSnapshotService(GitLabDataSnapshot snapshot) : IGitLabDataSnapshotService
     {
-        public Task<GitLabDataSnapshot> GetSnapshotAsync(CancellationToken cancellationToken)
+        public Task<IReadOnlyList<GitLabGroupDto>> GetAccessibleGroupsAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult<IReadOnlyList<GitLabGroupDto>>(snapshot.Groups);
+        }
+
+        public Task<GitLabDataSnapshot> GetSnapshotAsync(int groupId, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(snapshot);

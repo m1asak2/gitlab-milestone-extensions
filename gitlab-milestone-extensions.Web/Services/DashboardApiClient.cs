@@ -49,20 +49,23 @@ public sealed class DashboardApiClient(HttpClient httpClient, MilestoneSelection
 
     public async Task<MilestoneDashboardViewModel?> GetDashboardAsync(int milestoneId, CancellationToken cancellationToken = default)
     {
-        var url = $"api/dashboard?milestoneId={milestoneId}";
+        var groupId = GetRequiredSelectedGroupId();
+        var url = $"api/dashboard?groupId={groupId}&milestoneId={milestoneId}";
         return await GetFromApiAsync<MilestoneDashboardViewModel>(url, cancellationToken);
     }
 
     public async Task<IReadOnlyList<IssueViewModel>> GetIssuesAsync(int milestoneId, CancellationToken cancellationToken = default)
     {
-        var url = $"api/issues?milestoneId={milestoneId}";
+        var groupId = GetRequiredSelectedGroupId();
+        var url = $"api/issues?groupId={groupId}&milestoneId={milestoneId}";
         return await GetFromApiAsync<IReadOnlyList<IssueViewModel>>(url, cancellationToken)
             ?? throw new InvalidOperationException($"Failed to load {url}.");
     }
 
     public async Task<IReadOnlyList<GanttItemViewModel>> GetGanttAsync(int milestoneId, CancellationToken cancellationToken = default)
     {
-        var url = $"api/gantt?milestoneId={milestoneId}";
+        var groupId = GetRequiredSelectedGroupId();
+        var url = $"api/gantt?groupId={groupId}&milestoneId={milestoneId}";
         return await GetFromApiAsync<IReadOnlyList<GanttItemViewModel>>(url, cancellationToken)
             ?? throw new InvalidOperationException($"Failed to load {url}.");
     }
@@ -87,5 +90,15 @@ public sealed class DashboardApiClient(HttpClient httpClient, MilestoneSelection
         }
 
         return await response.Content.ReadFromJsonAsync<T>(cancellationToken: cancellationToken);
+    }
+
+    private int GetRequiredSelectedGroupId()
+    {
+        if (!selectionState.SelectedGroupId.HasValue)
+        {
+            throw new InvalidOperationException("GitLab group selection is required.");
+        }
+
+        return selectionState.SelectedGroupId.Value;
     }
 }

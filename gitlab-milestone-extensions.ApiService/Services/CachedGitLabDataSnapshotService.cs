@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
+using gitlab_milestone_extensions.ApiService.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Memory;
 
@@ -17,9 +18,12 @@ public sealed class CachedGitLabDataSnapshotService(
     private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
     private readonly SemaphoreSlim _fetchLock = new(1, 1);
 
-    public async Task<GitLabDataSnapshot> GetSnapshotAsync(CancellationToken cancellationToken)
+    public Task<IReadOnlyList<GitLabGroupDto>> GetAccessibleGroupsAsync(CancellationToken cancellationToken)
+        => gitLabApiClient.GetAccessibleGroupsAsync(cancellationToken);
+
+    public async Task<GitLabDataSnapshot> GetSnapshotAsync(int groupId, CancellationToken cancellationToken)
     {
-        var cacheKey = $"{CacheKeyPrefix}{ComputeTokenHash(GetRequiredPrivateToken(httpContextAccessor))}";
+        var cacheKey = $"{CacheKeyPrefix}{groupId}:{ComputeTokenHash(GetRequiredPrivateToken(httpContextAccessor))}";
         var stopwatch = Stopwatch.StartNew();
         if (memoryCache.TryGetValue<GitLabDataSnapshot>(cacheKey, out var cacheHit) && cacheHit is not null)
         {
@@ -45,10 +49,10 @@ public sealed class CachedGitLabDataSnapshotService(
             }
 
             var fetchStopwatch = Stopwatch.StartNew();
-            var groupTask = gitLabApiClient.GetGroupAsync(cancellationToken);
-            var projects = await gitLabApiClient.GetProjectsAsync(cancellationToken);
+            var groupTask = gitLabApiClient.GetGroupAsync(groupId, cancellationToken);
+            var projects = await gitLabApiClient.GetProjectsAsync(groupId, cancellationToken);
             var projectMilestonesTask = gitLabApiClient.GetProjectMilestonesAsync(projects, cancellationToken);
-            var groupMilestonesTask = gitLabApiClient.GetGroupMilestonesAsync(cancellationToken);
+            var groupMilestonesTask = gitLabApiClient.GetGroupMilestonesAsync(groupId, cancellationToken);
             var issuesTask = gitLabApiClient.GetProjectIssuesAsync(projects, cancellationToken);
             await Task.WhenAll(groupTask, projectMilestonesTask, groupMilestonesTask, issuesTask);
 

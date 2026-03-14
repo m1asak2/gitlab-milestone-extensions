@@ -73,7 +73,6 @@ docker/
 `ApiService` の Docker 実行時に外出しする設定は次のみです。
 
 - `GitLab__BaseUrl`
-- `GitLab__GroupId`
 
 現在の実装では、GitLab private token はブラウザから `X-GitLab-Private-Token` ヘッダで API へ送信されます。トークンの保存先は Web 側の local storage です。
 

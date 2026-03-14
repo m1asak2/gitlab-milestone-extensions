@@ -14,7 +14,6 @@ public class GitLabApiClient
     private const string ClientPrivateTokenHeaderName = "PRIVATE-TOKEN";
     private const string RequestPrivateTokenHeaderName = "X-GitLab-Private-Token";
     private readonly HttpClient _httpClient;
-    private readonly int _groupId;
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly ILogger<GitLabApiClient> _logger;
 
@@ -25,7 +24,6 @@ public class GitLabApiClient
         ILogger<GitLabApiClient> logger)
     {
         var opt = options.Value;
-        _groupId = opt.GroupId;
         _httpContextAccessor = httpContextAccessor;
         _logger = logger;
 
@@ -62,11 +60,35 @@ public class GitLabApiClient
         }
     }
 
-    public async Task<IReadOnlyList<GitLabProjectDto>> GetProjectsAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<GitLabGroupDto>> GetAccessibleGroupsAsync(CancellationToken cancellationToken = default)
     {
         var stopwatch = Stopwatch.StartNew();
+        var groups = await GetPagedAsync<GitLabGroupResponse>(
+            "groups?all_available=true",
+            cancellationToken);
+
+        var result = groups
+            .GroupBy(group => group.Id)
+            .Select(group => group.First())
+            .OrderBy(group => group.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new GitLabGroupDto(group.Id, group.Name, group.WebUrl))
+            .ToList();
+
+        stopwatch.Stop();
+        _logger.LogInformation(
+            "GitLab accessible groups fetched in {ElapsedMs}ms. Count={Count}",
+            stopwatch.ElapsedMilliseconds,
+            result.Count);
+
+        return result;
+    }
+
+    public async Task<IReadOnlyList<GitLabProjectDto>> GetProjectsAsync(int groupId, CancellationToken cancellationToken = default)
+    {
+        ValidateGroupId(groupId);
+        var stopwatch = Stopwatch.StartNew();
         var groupProjectsTask = GetPagedAsync<GitLabProjectResponse>(
-            $"groups/{_groupId}/projects?include_subgroups=true",
+            $"groups/{groupId}/projects?include_subgroups=true",
             cancellationToken);
         var membershipProjectsTask = GetPagedAsync<GitLabProjectResponse>(
             "projects?membership=true&simple=true",
@@ -82,7 +104,7 @@ public class GitLabApiClient
         _logger.LogInformation(
             "GitLab projects fetched in {ElapsedMs}ms. GroupId={GroupId}, Count={Count}",
             stopwatch.ElapsedMilliseconds,
-            _groupId,
+            groupId,
             projects.Count);
 
         return projects
@@ -90,17 +112,18 @@ public class GitLabApiClient
             .ToList();
     }
 
-    public async Task<GitLabGroupDto> GetGroupAsync(CancellationToken cancellationToken = default)
+    public async Task<GitLabGroupDto> GetGroupAsync(int groupId, CancellationToken cancellationToken = default)
     {
+        ValidateGroupId(groupId);
         var stopwatch = Stopwatch.StartNew();
-        var group = await GetAsync<GitLabGroupResponse>($"groups/{_groupId}", cancellationToken)
-            ?? throw new InvalidOperationException($"GitLab group '{_groupId}' was not found.");
+        var group = await GetAsync<GitLabGroupResponse>($"groups/{groupId}", cancellationToken)
+            ?? throw new InvalidOperationException($"GitLab group '{groupId}' was not found.");
         stopwatch.Stop();
 
         _logger.LogInformation(
             "GitLab group fetched in {ElapsedMs}ms. GroupId={GroupId}",
             stopwatch.ElapsedMilliseconds,
-            _groupId);
+            groupId);
 
         return new GitLabGroupDto(group.Id, group.Name, group.WebUrl);
     }
@@ -121,9 +144,9 @@ public class GitLabApiClient
         return new GitLabCurrentUserDto(user.Id, user.Name, user.Username, user.AvatarUrl, user.WebUrl);
     }
 
-    public async Task<IReadOnlyList<GitLabMilestoneDto>> GetProjectMilestonesAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<GitLabMilestoneDto>> GetProjectMilestonesAsync(int groupId, CancellationToken cancellationToken = default)
     {
-        var projects = await GetProjectsAsync(cancellationToken);
+        var projects = await GetProjectsAsync(groupId, cancellationToken);
         return await GetProjectMilestonesAsync(projects, cancellationToken);
     }
 
@@ -164,16 +187,17 @@ public class GitLabApiClient
         return results;
     }
 
-    public async Task<IReadOnlyList<GitLabMilestoneDto>> GetGroupMilestonesAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<GitLabMilestoneDto>> GetGroupMilestonesAsync(int groupId, CancellationToken cancellationToken = default)
     {
+        ValidateGroupId(groupId);
         var stopwatch = Stopwatch.StartNew();
         var milestones = await GetPagedAsync<GitLabMilestoneResponse>(
-            $"groups/{_groupId}/milestones",
+            $"groups/{groupId}/milestones",
             cancellationToken);
 
         var results = milestones
             .Select(m => new GitLabMilestoneDto(
-                ProjectId: _groupId,
+                ProjectId: groupId,
                 ProjectName: "Group",
                 MilestoneId: m.Id,
                 MilestoneIid: m.Id,
@@ -189,15 +213,15 @@ public class GitLabApiClient
         _logger.LogInformation(
             "GitLab group milestones fetched in {ElapsedMs}ms. GroupId={GroupId}, MilestoneCount={MilestoneCount}",
             stopwatch.ElapsedMilliseconds,
-            _groupId,
+            groupId,
             results.Count);
 
         return results;
     }
 
-    public async Task<IReadOnlyList<GitLabIssueDto>> GetProjectIssuesAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<GitLabIssueDto>> GetProjectIssuesAsync(int groupId, CancellationToken cancellationToken = default)
     {
-        var projects = await GetProjectsAsync(cancellationToken);
+        var projects = await GetProjectsAsync(groupId, cancellationToken);
         return await GetProjectIssuesAsync(projects, cancellationToken);
     }
 
@@ -303,6 +327,14 @@ public class GitLabApiClient
 
         _httpClient.DefaultRequestHeaders.Remove(ClientPrivateTokenHeaderName);
         _httpClient.DefaultRequestHeaders.TryAddWithoutValidation(ClientPrivateTokenHeaderName, privateToken);
+    }
+
+    private static void ValidateGroupId(int groupId)
+    {
+        if (groupId <= 0)
+        {
+            throw new InvalidOperationException("A valid GitLab groupId is required.");
+        }
     }
 
     private sealed record GitLabProjectResponse(

@@ -43,11 +43,17 @@ public static class DashboardEndpoints
             .WithName("GetSelectionOptions");
 
         group.MapGet("/dashboard", async (
+            int? groupId,
             int? milestoneId,
             IDashboardDataService service,
             ILoggerFactory loggerFactory,
             CancellationToken cancellationToken) =>
         {
+            if (!groupId.HasValue)
+            {
+                return Results.BadRequest("groupId is required.");
+            }
+
             if (!milestoneId.HasValue)
             {
                 return Results.BadRequest("milestoneId is required.");
@@ -55,11 +61,12 @@ public static class DashboardEndpoints
 
             var logger = loggerFactory.CreateLogger("DashboardEndpoints");
             var stopwatch = Stopwatch.StartNew();
-            var result = await service.GetDashboardAsync(milestoneId.Value, cancellationToken);
+            var result = await service.GetDashboardAsync(groupId.Value, milestoneId.Value, cancellationToken);
             stopwatch.Stop();
             logger.LogInformation(
-                "GET /api/dashboard completed in {ElapsedMs}ms. milestoneId={MilestoneId}",
+                "GET /api/dashboard completed in {ElapsedMs}ms. groupId={GroupId}, milestoneId={MilestoneId}",
                 stopwatch.ElapsedMilliseconds,
+                groupId.Value,
                 milestoneId.Value);
 
             return result is null ? Results.NotFound() : Results.Ok(result);
@@ -67,6 +74,7 @@ public static class DashboardEndpoints
             .WithName("GetDashboard");
 
         group.MapGet("/issues", async (
+            int? groupId,
             int? milestoneId,
             IDashboardDataService service,
             ILoggerFactory loggerFactory,
@@ -77,13 +85,19 @@ public static class DashboardEndpoints
                 return Results.Ok(Array.Empty<DashboardIssue>());
             }
 
+            if (!groupId.HasValue)
+            {
+                return Results.BadRequest("groupId is required.");
+            }
+
             var logger = loggerFactory.CreateLogger("DashboardEndpoints");
             var stopwatch = Stopwatch.StartNew();
-            var result = await service.GetIssuesAsync(milestoneId.Value, cancellationToken);
+            var result = await service.GetIssuesAsync(groupId.Value, milestoneId.Value, cancellationToken);
             stopwatch.Stop();
             logger.LogInformation(
-                "GET /api/issues completed in {ElapsedMs}ms. milestoneId={MilestoneId}. Count={Count}",
+                "GET /api/issues completed in {ElapsedMs}ms. groupId={GroupId}, milestoneId={MilestoneId}. Count={Count}",
                 stopwatch.ElapsedMilliseconds,
+                groupId.Value,
                 milestoneId.Value,
                 result.Count);
             return Results.Ok(result);
@@ -91,6 +105,7 @@ public static class DashboardEndpoints
             .WithName("GetIssues");
 
         group.MapGet("/gantt", async (
+            int? groupId,
             int? milestoneId,
             IDashboardDataService service,
             ILoggerFactory loggerFactory,
@@ -101,13 +116,19 @@ public static class DashboardEndpoints
                 return Results.Ok(Array.Empty<GanttItemDto>());
             }
 
+            if (!groupId.HasValue)
+            {
+                return Results.BadRequest("groupId is required.");
+            }
+
             var logger = loggerFactory.CreateLogger("DashboardEndpoints");
             var stopwatch = Stopwatch.StartNew();
-            var result = await service.GetGanttAsync(milestoneId.Value, cancellationToken);
+            var result = await service.GetGanttAsync(groupId.Value, milestoneId.Value, cancellationToken);
             stopwatch.Stop();
             logger.LogInformation(
-                "GET /api/gantt completed in {ElapsedMs}ms. milestoneId={MilestoneId}. Count={Count}",
+                "GET /api/gantt completed in {ElapsedMs}ms. groupId={GroupId}, milestoneId={MilestoneId}. Count={Count}",
                 stopwatch.ElapsedMilliseconds,
+                groupId.Value,
                 milestoneId.Value,
                 result.Count);
             return Results.Ok(result);
