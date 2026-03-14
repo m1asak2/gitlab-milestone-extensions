@@ -14,17 +14,18 @@ public sealed class GitLabDashboardDataService(IGitLabDataSnapshotService snapsh
         int? milestoneId,
         CancellationToken cancellationToken)
     {
-        var snapshot = await snapshotService.GetSnapshotAsync(cancellationToken);
-        var groups = snapshot.Groups
+        var groups = (await snapshotService.GetAccessibleGroupsAsync(cancellationToken))
             .Select(g => new SelectorGroupDto(g.GroupId, g.GroupName))
             .OrderBy(g => g.GroupName)
             .ToList();
-        var issues = BuildDashboardIssues(snapshot.Issues);
-        var hasValidGroup = !groupId.HasValue || groups.Any(g => g.GroupId == groupId.Value);
-        if (!hasValidGroup)
+
+        if (groupId.HasValue && groups.All(g => g.GroupId != groupId.Value))
         {
             return new SelectionOptionsDto(groups, [], [], []);
         }
+
+        var snapshot = await snapshotService.GetSnapshotAsync(groupId, cancellationToken);
+        var issues = BuildDashboardIssues(snapshot.Issues);
 
         IEnumerable<DashboardIssue> FilterIssues(
             int? selectedMemberId,
@@ -50,7 +51,9 @@ public sealed class GitLabDashboardDataService(IGitLabDataSnapshotService snapsh
             return scoped;
         }
 
-        var memberSource = FilterIssues(null, projectId, milestoneId)
+        var memberSource = (!projectId.HasValue && !milestoneId.HasValue
+                ? issues.AsEnumerable()
+                : FilterIssues(null, projectId, milestoneId))
             .Where(i => i.AssigneeId.HasValue);
         var members = memberSource
             .GroupBy(i => i.AssigneeId!.Value)
@@ -60,23 +63,23 @@ public sealed class GitLabDashboardDataService(IGitLabDataSnapshotService snapsh
             .OrderBy(m => m.MemberName)
             .ToList();
 
-        var projectIds = FilterIssues(memberId, null, milestoneId)
-            .Select(i => i.ProjectId)
-            .Distinct()
-            .ToHashSet();
+        var projectIds = memberId.HasValue || milestoneId.HasValue
+            ? FilterIssues(memberId, null, milestoneId)
+                .Select(i => i.ProjectId)
+                .Distinct()
+                .ToHashSet()
+            : null;
         var projects = snapshot.Projects
-            .Where(p => projectIds.Contains(p.ProjectId))
+            .Where(p => projectIds is null || projectIds.Contains(p.ProjectId))
             .Select(p => new SelectorProjectDto(p.ProjectId, p.ProjectName))
             .OrderBy(p => p.ProjectName)
             .ToList();
 
-        var milestoneIds = FilterIssues(memberId, projectId, null)
-            .Where(i => i.MilestoneId.HasValue)
-            .Select(i => i.MilestoneId!.Value)
-            .Distinct()
-            .ToHashSet();
         var milestones = snapshot.Milestones
-            .Where(m => milestoneIds.Contains(m.MilestoneId))
+            .Where(m => !projectId.HasValue || m.ProjectId == projectId.Value)
+            .Where(m => !memberId.HasValue || issues.Any(issue =>
+                issue.AssigneeId == memberId.Value &&
+                issue.MilestoneId == m.MilestoneId))
             .GroupBy(m => m.MilestoneId)
             .Select(g => g.First())
             .Select(m => new SelectorMilestoneDto(
@@ -92,9 +95,9 @@ public sealed class GitLabDashboardDataService(IGitLabDataSnapshotService snapsh
         return new SelectionOptionsDto(groups, members, projects, milestones);
     }
 
-    public async Task<MilestoneDashboardDto?> GetDashboardAsync(int milestoneId, CancellationToken cancellationToken)
+    public async Task<MilestoneDashboardDto?> GetDashboardAsync(int? groupId, int milestoneId, CancellationToken cancellationToken)
     {
-        var snapshot = await snapshotService.GetSnapshotAsync(cancellationToken);
+        var snapshot = await snapshotService.GetSnapshotAsync(groupId, cancellationToken);
         var issues = BuildDashboardIssues(snapshot.Issues)
             .Where(i => i.MilestoneId == milestoneId)
             .ToList();
@@ -124,17 +127,17 @@ public sealed class GitLabDashboardDataService(IGitLabDataSnapshotService snapsh
             ActualSeconds: issues.Sum(i => i.TotalTimeSpentSeconds));
     }
 
-    public async Task<IReadOnlyList<DashboardIssue>> GetIssuesAsync(int milestoneId, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<DashboardIssue>> GetIssuesAsync(int? groupId, int milestoneId, CancellationToken cancellationToken)
     {
-        var snapshot = await snapshotService.GetSnapshotAsync(cancellationToken);
+        var snapshot = await snapshotService.GetSnapshotAsync(groupId, cancellationToken);
         return BuildDashboardIssues(snapshot.Issues)
             .Where(i => i.MilestoneId == milestoneId)
             .ToList();
     }
 
-    public async Task<IReadOnlyList<GanttItemDto>> GetGanttAsync(int milestoneId, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<GanttItemDto>> GetGanttAsync(int? groupId, int milestoneId, CancellationToken cancellationToken)
     {
-        var snapshot = await snapshotService.GetSnapshotAsync(cancellationToken);
+        var snapshot = await snapshotService.GetSnapshotAsync(groupId, cancellationToken);
         var milestone = snapshot.Milestones.FirstOrDefault(m => m.MilestoneId == milestoneId);
         var today = DateOnly.FromDateTime(DateTime.Today);
 

@@ -26,7 +26,7 @@
 
 - GitLab 標準 UI で横断把握しにくいマイルストーン進捗を一覧化する
 - 複数プロジェクトにまたがる Issue 情報をバックエンドで集約する
-- GitLab のアクセストークンをブラウザへ露出させずに可視化する
+- GitLab のアクセストークンを Web 側で保持し、API 経由で GitLab を参照する
 - フロントエンド側を単純な参照 UI に保ち、取得・集計責務を API 側に集約する
 
 ## 4. スコープ
@@ -73,7 +73,7 @@
 ### 5.3 実行形態
 
 - AppHost から `ApiService` と `Web` を起動する
-- `Web` は `ApiBaseUrl` を用いて `ApiService` にアクセスする
+- `Web` は相対パス `/api/*` を用いて `ApiService` にアクセスする
 - `ApiService` は `GitLab` 設定を用いて外部 GitLab サーバーへアクセスする
 
 ## 6. 技術スタック
@@ -94,10 +94,15 @@
 
 ```text
 gitlab-milestone-extensions/
+├─ docker/
+│  ├─ api/
+│  ├─ compose/
+│  └─ web/
 ├─ docs/
 │  ├─ architecture.md
 │  ├─ api-design.md
-│  └─ design-specification-ja.md
+│  ├─ design-specification-ja.md
+│  └─ docker-deployment.md
 ├─ gitlab-milestone-extensions.AppHost/
 ├─ gitlab-milestone-extensions.ServiceDefaults/
 ├─ gitlab-milestone-extensions.ApiService/
@@ -386,9 +391,10 @@ Milestone 取得仕様:
 
 - ルートコンポーネント登録
 - MudBlazor サービス登録
-- `ApiBaseUrl` を元に `HttpClient.BaseAddress` を設定
+- 配信元オリジンを `HttpClient.BaseAddress` に設定
 - `DashboardApiClient` 登録
 - `MilestoneSelectionState` 登録
+- `PrivateTokenStorage` 登録
 
 ### 9.2 画面構成
 
@@ -550,21 +556,16 @@ Milestone 取得仕様:
 | 設定キー | 必須 | 内容 |
 | --- | --- | --- |
 | `GitLab:BaseUrl` | 必須 | GitLab ベース URL |
-| `GitLab:PrivateToken` | 必須 | GitLab アクセストークン |
 | `GitLab:GroupId` | 必須 | 対象グループ ID |
 
 注意事項:
 
 - `appsettings.json` には `GroupId` が未定義のため、実運用では環境別設定またはシークレット管理で補完すること
-- アクセストークンは本来ソース管理へ含めず、User Secrets や環境変数で管理することが望ましい
+- Docker 実行時に外出しする設定は `GitLab:BaseUrl` を基本とする
 
 ### 11.2 Web 設定
 
-`wwwroot/appsettings.json`
-
-| 設定キー | 必須 | 内容 |
-| --- | --- | --- |
-| `ApiBaseUrl` | 必須 | API サービスのベース URL |
+Web 側は API ベース URL の設定を持たず、配信元オリジンに対する相対パス `/api/*` を利用する。
 
 ## 12. 非機能要件
 
@@ -587,8 +588,8 @@ Milestone 取得仕様:
 
 ### 12.4 セキュリティ
 
-- GitLab トークンは API サービス側のみで使用する
-- WebAssembly クライアントは GitLab へ直接アクセスしない
+- GitLab トークンは Web 側の local storage に保持し、API 呼び出し時に `X-GitLab-Private-Token` ヘッダで転送する
+- WebAssembly クライアントは GitLab へ直接アクセスせず、API を経由する
 - CORS は現状 `AllowAnyOrigin` のため、公開運用時は制限が必要
 
 ## 13. エラー処理方針

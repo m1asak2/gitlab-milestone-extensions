@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
+using gitlab_milestone_extensions.ApiService.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Memory;
 
@@ -17,9 +18,13 @@ public sealed class CachedGitLabDataSnapshotService(
     private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
     private readonly SemaphoreSlim _fetchLock = new(1, 1);
 
-    public async Task<GitLabDataSnapshot> GetSnapshotAsync(CancellationToken cancellationToken)
+    public Task<IReadOnlyList<GitLabGroupDto>> GetAccessibleGroupsAsync(CancellationToken cancellationToken)
+        => gitLabApiClient.GetAccessibleGroupsAsync(cancellationToken);
+
+    public async Task<GitLabDataSnapshot> GetSnapshotAsync(int? groupId, CancellationToken cancellationToken)
     {
-        var cacheKey = $"{CacheKeyPrefix}{ComputeTokenHash(GetRequiredPrivateToken(httpContextAccessor))}";
+        var scopeKey = groupId?.ToString() ?? "membership";
+        var cacheKey = $"{CacheKeyPrefix}{scopeKey}:{ComputeTokenHash(GetRequiredPrivateToken(httpContextAccessor))}";
         var stopwatch = Stopwatch.StartNew();
         if (memoryCache.TryGetValue<GitLabDataSnapshot>(cacheKey, out var cacheHit) && cacheHit is not null)
         {
@@ -45,17 +50,20 @@ public sealed class CachedGitLabDataSnapshotService(
             }
 
             var fetchStopwatch = Stopwatch.StartNew();
-            var groupTask = gitLabApiClient.GetGroupAsync(cancellationToken);
-            var projects = await gitLabApiClient.GetProjectsAsync(cancellationToken);
+            var groupTask = GetGroupOrDefaultAsync(groupId, cancellationToken);
+            var projects = await gitLabApiClient.GetProjectsAsync(groupId, cancellationToken);
             var projectMilestonesTask = gitLabApiClient.GetProjectMilestonesAsync(projects, cancellationToken);
-            var groupMilestonesTask = gitLabApiClient.GetGroupMilestonesAsync(cancellationToken);
+            var groupMilestonesTask = gitLabApiClient.GetGroupMilestonesAsync(groupId, cancellationToken);
             var issuesTask = gitLabApiClient.GetProjectIssuesAsync(projects, cancellationToken);
             await Task.WhenAll(groupTask, projectMilestonesTask, groupMilestonesTask, issuesTask);
 
-            var groups = new[] { await groupTask };
+            var resolvedGroup = await groupTask;
+            var groups = resolvedGroup is null ? [] : new[] { resolvedGroup };
             var projectMilestones = await projectMilestonesTask;
             var groupMilestones = (await groupMilestonesTask)
-                .Select(m => m with
+                .Select(m => groups.Length == 0
+                    ? m
+                    : m with
                 {
                     WebUrl = groups[0].WebUrl is null ? null : $"{groups[0].WebUrl}/-/milestones/{m.MilestoneId}"
                 })
@@ -112,5 +120,15 @@ public sealed class CachedGitLabDataSnapshotService(
     {
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(privateToken));
         return Convert.ToHexString(bytes);
+    }
+
+    private async Task<GitLabGroupDto?> GetGroupOrDefaultAsync(int? groupId, CancellationToken cancellationToken)
+    {
+        if (!groupId.HasValue)
+        {
+            return null;
+        }
+
+        return await gitLabApiClient.GetGroupAsync(groupId.Value, cancellationToken);
     }
 }

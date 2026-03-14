@@ -4,7 +4,9 @@ namespace gitlab_milestone_extensions.ApiService.Services;
 
 public interface IGitLabDataSnapshotService
 {
-    Task<GitLabDataSnapshot> GetSnapshotAsync(CancellationToken cancellationToken);
+    Task<IReadOnlyList<GitLabGroupDto>> GetAccessibleGroupsAsync(CancellationToken cancellationToken);
+
+    Task<GitLabDataSnapshot> GetSnapshotAsync(int? groupId, CancellationToken cancellationToken);
 }
 
 public sealed record GitLabDataSnapshot(

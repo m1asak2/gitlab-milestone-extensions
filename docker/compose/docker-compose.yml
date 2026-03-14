@@ -1,0 +1,21 @@
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: docker/api/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      GitLab__BaseUrl: ${GITLAB_BASE_URL:-http://gitlab.local}
+    extra_hosts:
+      - "gitlab.local:host-gateway"
+    expose:
+      - "8080"
+
+  web:
+    build:
+      context: ../..
+      dockerfile: docker/web/Dockerfile
+    depends_on:
+      - api
+    ports:
+      - "${WEB_PORT:-8080}:8080"
