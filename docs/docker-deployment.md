@@ -24,7 +24,7 @@ docker/
 ├─ api/
 │  └─ Dockerfile
 ├─ compose/
-│  ├─ .env.example
+│  ├─ .env
 │  └─ docker-compose.yml
 └─ web/
    ├─ Dockerfile
@@ -89,6 +89,6 @@ docker/
 
 ## Usage
 
-1. `docker/compose/.env.example` を `docker/compose/.env` としてコピーする
-2. `GITLAB_BASE_URL` を実環境に合わせて設定する
-3. `docker compose -f docker/compose/docker-compose.yml up --build` を実行する
+1. `docker/compose/.env` の `GITLAB_BASE_URL` を実環境に合わせて設定する
+2. `docker/compose` ディレクトリへ移動する
+3. `docker compose up -d --build` を実行する

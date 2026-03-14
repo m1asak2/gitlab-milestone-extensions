@@ -10,9 +10,12 @@ builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
 builder.Services.AddMudServices();
+var apiBaseUrl = builder.Configuration["ApiBaseUrl"];
 builder.Services.AddScoped(_ => new HttpClient
 {
-    BaseAddress = new Uri(builder.HostEnvironment.BaseAddress)
+    BaseAddress = string.IsNullOrWhiteSpace(apiBaseUrl)
+        ? new Uri(builder.HostEnvironment.BaseAddress)
+        : new Uri(apiBaseUrl, UriKind.Absolute)
 });
 builder.Services.AddScoped<DashboardApiClient>();
 builder.Services.AddScoped<MilestoneSelectionState>();

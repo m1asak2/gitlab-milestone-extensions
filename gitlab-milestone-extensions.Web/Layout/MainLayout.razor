@@ -7,7 +7,10 @@
 
 <MudLayout>
     <MudAppBar Elevation="1">
-        <MudText Typo="Typo.h6">GitLab Milestone Dashboard</MudText>
+        <MudLink Href="/" OnClick="NavigateHomeAsync" Underline="Underline.None" Class="text-decoration-none"
+                 Style="color: white;">
+            <MudText Typo="Typo.h6" Color="Color.Inherit" Style="color: white;">GitLab Milestone Dashboard</MudText>
+        </MudLink>
         <MudSpacer />
         @if (_currentGitLabUser is not null)
         {
@@ -32,17 +35,13 @@
                     <MudGrid Class="mb-4">
                         <MudItem xs="12" md="8">
                             <label class="selector-label" for="private-token-input">GitLab Private Token</label>
-                            <input id="private-token-input"
-                                   class="selector-input"
-                                   type="password"
+                            <input id="private-token-input" class="selector-input" type="password"
                                    value="@(_privateTokenInput ?? string.Empty)"
                                    @oninput="@(args => _privateTokenInput = args.Value?.ToString())"
                                    placeholder="GitLab の Private Token を入力" />
                         </MudItem>
                         <MudItem xs="12" md="4" Class="d-flex align-end">
-                            <MudButton Variant="Variant.Filled"
-                                       Color="Color.Primary"
-                                       OnClick="ApplyPrivateTokenAsync"
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ApplyPrivateTokenAsync"
                                        Disabled="@_isLoadingSelectors">
                                 Apply Token
                             </MudButton>
@@ -53,10 +52,8 @@
                 <MudGrid>
                     <MudItem xs="12" sm="6" md="3">
                         <label class="selector-label" for="group-select">Group</label>
-                        <select id="group-select"
-                                class="selector-input"
-                                value="@(_selectedGroupId?.ToString() ?? string.Empty)"
-                                @onchange="OnGroupChanged"
+                        <select id="group-select" class="selector-input"
+                                value="@(_selectedGroupId?.ToString() ?? string.Empty)" @onchange="OnGroupChanged"
                                 disabled="@(_isLoadingSelectors || !SelectionState.HasPrivateToken)">
                             <option value="">Select Group</option>
                             @foreach (var group in _groups)
@@ -67,10 +64,8 @@
                     </MudItem>
                     <MudItem xs="12" sm="6" md="3">
                         <label class="selector-label" for="member-select">Member</label>
-                        <select id="member-select"
-                                class="selector-input"
-                                value="@(_selectedMemberId?.ToString() ?? string.Empty)"
-                                @onchange="OnMemberChanged"
+                        <select id="member-select" class="selector-input"
+                                value="@(_selectedMemberId?.ToString() ?? string.Empty)" @onchange="OnMemberChanged"
                                 disabled="@(_isLoadingSelectors || !SelectionState.HasPrivateToken)">
                             <option value="">Select Member</option>
                             @foreach (var member in _members)
@@ -81,10 +76,8 @@
                     </MudItem>
                     <MudItem xs="12" sm="6" md="3">
                         <label class="selector-label" for="project-select">Project</label>
-                        <select id="project-select"
-                                class="selector-input"
-                                value="@(_selectedProjectId?.ToString() ?? string.Empty)"
-                                @onchange="OnProjectChanged"
+                        <select id="project-select" class="selector-input"
+                                value="@(_selectedProjectId?.ToString() ?? string.Empty)" @onchange="OnProjectChanged"
                                 disabled="@(_isLoadingSelectors || !SelectionState.HasPrivateToken)">
                             <option value="">Select Project</option>
                             @foreach (var project in _projects)
@@ -95,10 +88,8 @@
                     </MudItem>
                     <MudItem xs="12" sm="6" md="3">
                         <label class="selector-label" for="milestone-select">Milestone</label>
-                        <select id="milestone-select"
-                                class="selector-input"
-                                value="@(_selectedMilestoneId?.ToString() ?? string.Empty)"
-                                @onchange="OnMilestoneChanged"
+                        <select id="milestone-select" class="selector-input"
+                                value="@(_selectedMilestoneId?.ToString() ?? string.Empty)" @onchange="OnMilestoneChanged"
                                 disabled="@(_isLoadingSelectors || !SelectionState.HasPrivateToken)">
                             <option value="">Select Milestone</option>
                             @foreach (var milestone in _milestones)
@@ -179,6 +170,13 @@
     {
         _privateTokenInput = SelectionState.PrivateToken;
         _isTokenEditorVisible = true;
+    }
+
+    private Task NavigateHomeAsync(MouseEventArgs _)
+    {
+        SelectionState.SetSelection(null, null, null, null);
+        NavigationManager.NavigateTo("/", replace: true);
+        return Task.CompletedTask;
     }
 
     private async Task OnMemberChanged(ChangeEventArgs args)
@@ -423,7 +421,8 @@
 
         var targetUri = query.Count == 0
             ? path
-            : $"{path}?{string.Join("&", query.Select(kvp => $"{Uri.EscapeDataString(kvp.Key)}={Uri.EscapeDataString(kvp.Value)}"))}";
+            : $"{path}?{string.Join("&", query.Select(kvp =>
+$"{Uri.EscapeDataString(kvp.Key)}={Uri.EscapeDataString(kvp.Value)}"))}";
 
         if (string.Equals(targetUri, NavigationManager.Uri, StringComparison.Ordinal))
         {
