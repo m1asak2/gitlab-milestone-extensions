@@ -1,5 +1,6 @@
 using gitlab_milestone_extensions.ApiService.Models;
 using gitlab_milestone_extensions.ApiService.Services;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace gitlab_milestone_extensions.Tests;
 
@@ -8,7 +9,9 @@ public sealed class GitLabDashboardDataServiceTests
     [Fact]
     public async Task GetDashboardAsync_ReturnsMilestoneWebUrl()
     {
-        var service = new GitLabDashboardDataService(new StubSnapshotService(CreateSnapshot()));
+        var service = new GitLabDashboardDataService(
+            new StubSnapshotService(CreateSnapshot()),
+            NullLogger<GitLabDashboardDataService>.Instance);
 
         var result = await service.GetDashboardAsync(null, 201, CancellationToken.None);
 
@@ -23,7 +26,9 @@ public sealed class GitLabDashboardDataServiceTests
     [Fact]
     public async Task GetIssuesAsync_MapsIssueAndProjectUrls()
     {
-        var service = new GitLabDashboardDataService(new StubSnapshotService(CreateSnapshot()));
+        var service = new GitLabDashboardDataService(
+            new StubSnapshotService(CreateSnapshot()),
+            NullLogger<GitLabDashboardDataService>.Instance);
 
         var issues = await service.GetIssuesAsync(null, 201, CancellationToken.None);
 

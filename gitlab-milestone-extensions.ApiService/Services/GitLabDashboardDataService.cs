@@ -5,7 +5,9 @@ namespace gitlab_milestone_extensions.ApiService.Services;
 /// <summary>
 /// Read-only dashboard data provider backed by a cached GitLab snapshot.
 /// </summary>
-public sealed class GitLabDashboardDataService(IGitLabDataSnapshotService snapshotService) : IDashboardDataService
+public sealed class GitLabDashboardDataService(
+    IGitLabDataSnapshotService snapshotService,
+    ILogger<GitLabDashboardDataService> logger) : IDashboardDataService
 {
     public async Task<SelectionOptionsDto> GetSelectionOptionsAsync(
         int? groupId,
@@ -14,155 +16,193 @@ public sealed class GitLabDashboardDataService(IGitLabDataSnapshotService snapsh
         int? milestoneId,
         CancellationToken cancellationToken)
     {
-        var groups = (await snapshotService.GetAccessibleGroupsAsync(cancellationToken))
-            .Select(g => new SelectorGroupDto(g.GroupId, g.GroupName))
-            .OrderBy(g => g.GroupName)
-            .ToList();
-
-        if (groupId.HasValue && groups.All(g => g.GroupId != groupId.Value))
+        try
         {
-            return new SelectionOptionsDto(groups, [], [], []);
+            var groups = (await snapshotService.GetAccessibleGroupsAsync(cancellationToken))
+                .Select(g => new SelectorGroupDto(g.GroupId, g.GroupName))
+                .OrderBy(g => g.GroupName)
+                .ToList();
+
+            if (groupId.HasValue && groups.All(g => g.GroupId != groupId.Value))
+            {
+                return new SelectionOptionsDto(groups, [], [], []);
+            }
+
+            var snapshot = await snapshotService.GetSnapshotAsync(groupId, cancellationToken);
+            var issues = BuildDashboardIssues(snapshot.Issues);
+
+            IEnumerable<DashboardIssue> FilterIssues(
+                int? selectedMemberId,
+                int? selectedProjectId,
+                int? selectedMilestoneId)
+            {
+                var scoped = issues.AsEnumerable();
+                if (selectedMemberId.HasValue)
+                {
+                    scoped = scoped.Where(i => i.AssigneeId == selectedMemberId.Value);
+                }
+
+                if (selectedProjectId.HasValue)
+                {
+                    scoped = scoped.Where(i => i.ProjectId == selectedProjectId.Value);
+                }
+
+                if (selectedMilestoneId.HasValue)
+                {
+                    scoped = scoped.Where(i => i.MilestoneId == selectedMilestoneId.Value);
+                }
+
+                return scoped;
+            }
+
+            var memberSource = (!projectId.HasValue && !milestoneId.HasValue
+                    ? issues.AsEnumerable()
+                    : FilterIssues(null, projectId, milestoneId))
+                .Where(i => i.AssigneeId.HasValue);
+            var members = memberSource
+                .GroupBy(i => i.AssigneeId!.Value)
+                .Select(g => new SelectorMemberDto(
+                    g.Key,
+                    g.Select(i => i.AssigneeName).FirstOrDefault(name => !string.IsNullOrWhiteSpace(name)) ?? $"Member {g.Key}"))
+                .OrderBy(m => m.MemberName)
+                .ToList();
+
+            var projectIds = memberId.HasValue || milestoneId.HasValue
+                ? FilterIssues(memberId, null, milestoneId)
+                    .Select(i => i.ProjectId)
+                    .Distinct()
+                    .ToHashSet()
+                : null;
+            var projects = snapshot.Projects
+                .Where(p => projectIds is null || projectIds.Contains(p.ProjectId))
+                .Select(p => new SelectorProjectDto(p.ProjectId, p.ProjectName))
+                .OrderBy(p => p.ProjectName)
+                .ToList();
+
+            var milestones = snapshot.Milestones
+                .Where(m => !projectId.HasValue || m.ProjectId == projectId.Value)
+                .Where(m => !memberId.HasValue || issues.Any(issue =>
+                    issue.AssigneeId == memberId.Value &&
+                    issue.MilestoneId == m.MilestoneId))
+                .GroupBy(m => m.MilestoneId)
+                .Select(g => g.First())
+                .Select(m => new SelectorMilestoneDto(
+                    m.MilestoneId,
+                    m.Title,
+                    m.ProjectId,
+                    m.ProjectName,
+                    m.StartDate,
+                    m.DueDate))
+                .OrderBy(m => m.MilestoneTitle)
+                .ToList();
+
+            return new SelectionOptionsDto(groups, members, projects, milestones);
         }
-
-        var snapshot = await snapshotService.GetSnapshotAsync(groupId, cancellationToken);
-        var issues = BuildDashboardIssues(snapshot.Issues);
-
-        IEnumerable<DashboardIssue> FilterIssues(
-            int? selectedMemberId,
-            int? selectedProjectId,
-            int? selectedMilestoneId)
+        catch (Exception ex)
         {
-            var scoped = issues.AsEnumerable();
-            if (selectedMemberId.HasValue)
-            {
-                scoped = scoped.Where(i => i.AssigneeId == selectedMemberId.Value);
-            }
-
-            if (selectedProjectId.HasValue)
-            {
-                scoped = scoped.Where(i => i.ProjectId == selectedProjectId.Value);
-            }
-
-            if (selectedMilestoneId.HasValue)
-            {
-                scoped = scoped.Where(i => i.MilestoneId == selectedMilestoneId.Value);
-            }
-
-            return scoped;
+            logger.LogError(
+                ex,
+                "Failed to build selection options. groupId={GroupId}, memberId={MemberId}, projectId={ProjectId}, milestoneId={MilestoneId}",
+                groupId,
+                memberId,
+                projectId,
+                milestoneId);
+            return new SelectionOptionsDto([], [], [], []);
         }
-
-        var memberSource = (!projectId.HasValue && !milestoneId.HasValue
-                ? issues.AsEnumerable()
-                : FilterIssues(null, projectId, milestoneId))
-            .Where(i => i.AssigneeId.HasValue);
-        var members = memberSource
-            .GroupBy(i => i.AssigneeId!.Value)
-            .Select(g => new SelectorMemberDto(
-                g.Key,
-                g.Select(i => i.AssigneeName).FirstOrDefault(name => !string.IsNullOrWhiteSpace(name)) ?? $"Member {g.Key}"))
-            .OrderBy(m => m.MemberName)
-            .ToList();
-
-        var projectIds = memberId.HasValue || milestoneId.HasValue
-            ? FilterIssues(memberId, null, milestoneId)
-                .Select(i => i.ProjectId)
-                .Distinct()
-                .ToHashSet()
-            : null;
-        var projects = snapshot.Projects
-            .Where(p => projectIds is null || projectIds.Contains(p.ProjectId))
-            .Select(p => new SelectorProjectDto(p.ProjectId, p.ProjectName))
-            .OrderBy(p => p.ProjectName)
-            .ToList();
-
-        var milestones = snapshot.Milestones
-            .Where(m => !projectId.HasValue || m.ProjectId == projectId.Value)
-            .Where(m => !memberId.HasValue || issues.Any(issue =>
-                issue.AssigneeId == memberId.Value &&
-                issue.MilestoneId == m.MilestoneId))
-            .GroupBy(m => m.MilestoneId)
-            .Select(g => g.First())
-            .Select(m => new SelectorMilestoneDto(
-                m.MilestoneId,
-                m.Title,
-                m.ProjectId,
-                m.ProjectName,
-                m.StartDate,
-                m.DueDate))
-            .OrderBy(m => m.MilestoneTitle)
-            .ToList();
-
-        return new SelectionOptionsDto(groups, members, projects, milestones);
     }
 
     public async Task<MilestoneDashboardDto?> GetDashboardAsync(int? groupId, int milestoneId, CancellationToken cancellationToken)
     {
-        var snapshot = await snapshotService.GetSnapshotAsync(groupId, cancellationToken);
-        var issues = BuildDashboardIssues(snapshot.Issues)
-            .Where(i => i.MilestoneId == milestoneId)
-            .ToList();
-
-        if (issues.Count == 0)
+        try
         {
+            var snapshot = await snapshotService.GetSnapshotAsync(groupId, cancellationToken);
+            var issues = BuildDashboardIssues(snapshot.Issues)
+                .Where(i => i.MilestoneId == milestoneId)
+                .ToList();
+
+            if (issues.Count == 0)
+            {
+                return null;
+            }
+
+            var milestone = snapshot.Milestones.FirstOrDefault(m => m.MilestoneId == milestoneId);
+            var today = DateOnly.FromDateTime(DateTime.Today);
+
+            return new MilestoneDashboardDto(
+                MilestoneId: milestoneId,
+                MilestoneTitle: milestone?.Title ?? issues[0].MilestoneTitle,
+                MilestoneWebUrl: milestone?.WebUrl,
+                TotalIssues: issues.Count,
+                OpenIssues: issues.Count(i => i.State.Equals("opened", StringComparison.OrdinalIgnoreCase)),
+                ClosedIssues: issues.Count(i => i.State.Equals("closed", StringComparison.OrdinalIgnoreCase)),
+                OverdueIssues: issues.Count(i =>
+                    i.State.Equals("opened", StringComparison.OrdinalIgnoreCase) &&
+                    i.DueDate.HasValue &&
+                    i.DueDate.Value < today),
+                StartDate: milestone?.StartDate,
+                DueDate: milestone?.DueDate,
+                EstimateSeconds: issues.Sum(i => i.TimeEstimateSeconds),
+                ActualSeconds: issues.Sum(i => i.TotalTimeSpentSeconds));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to build dashboard. groupId={GroupId}, milestoneId={MilestoneId}", groupId, milestoneId);
             return null;
         }
-
-        var milestone = snapshot.Milestones.FirstOrDefault(m => m.MilestoneId == milestoneId);
-        var today = DateOnly.FromDateTime(DateTime.Today);
-
-        return new MilestoneDashboardDto(
-            MilestoneId: milestoneId,
-            MilestoneTitle: milestone?.Title ?? issues[0].MilestoneTitle,
-            MilestoneWebUrl: milestone?.WebUrl,
-            TotalIssues: issues.Count,
-            OpenIssues: issues.Count(i => i.State.Equals("opened", StringComparison.OrdinalIgnoreCase)),
-            ClosedIssues: issues.Count(i => i.State.Equals("closed", StringComparison.OrdinalIgnoreCase)),
-            OverdueIssues: issues.Count(i =>
-                i.State.Equals("opened", StringComparison.OrdinalIgnoreCase) &&
-                i.DueDate.HasValue &&
-                i.DueDate.Value < today),
-            StartDate: milestone?.StartDate,
-            DueDate: milestone?.DueDate,
-            EstimateSeconds: issues.Sum(i => i.TimeEstimateSeconds),
-            ActualSeconds: issues.Sum(i => i.TotalTimeSpentSeconds));
     }
 
     public async Task<IReadOnlyList<DashboardIssue>> GetIssuesAsync(int? groupId, int milestoneId, CancellationToken cancellationToken)
     {
-        var snapshot = await snapshotService.GetSnapshotAsync(groupId, cancellationToken);
-        return BuildDashboardIssues(snapshot.Issues)
-            .Where(i => i.MilestoneId == milestoneId)
-            .ToList();
+        try
+        {
+            var snapshot = await snapshotService.GetSnapshotAsync(groupId, cancellationToken);
+            return BuildDashboardIssues(snapshot.Issues)
+                .Where(i => i.MilestoneId == milestoneId)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to build issues list. groupId={GroupId}, milestoneId={MilestoneId}", groupId, milestoneId);
+            return [];
+        }
     }
 
     public async Task<IReadOnlyList<GanttItemDto>> GetGanttAsync(int? groupId, int milestoneId, CancellationToken cancellationToken)
     {
-        var snapshot = await snapshotService.GetSnapshotAsync(groupId, cancellationToken);
-        var milestone = snapshot.Milestones.FirstOrDefault(m => m.MilestoneId == milestoneId);
-        var today = DateOnly.FromDateTime(DateTime.Today);
+        try
+        {
+            var snapshot = await snapshotService.GetSnapshotAsync(groupId, cancellationToken);
+            var milestone = snapshot.Milestones.FirstOrDefault(m => m.MilestoneId == milestoneId);
+            var today = DateOnly.FromDateTime(DateTime.Today);
 
-        return BuildDashboardIssues(snapshot.Issues)
-            .Where(i => i.MilestoneId == milestoneId)
-            .Select((issue, index) =>
-            {
-                var endDate = issue.DueDate ?? milestone?.DueDate ?? today;
-                var startDate = milestone?.StartDate ?? endDate.AddDays(-7);
-                var progress = issue.State.Equals("closed", StringComparison.OrdinalIgnoreCase) ? 100 : 0;
+            return BuildDashboardIssues(snapshot.Issues)
+                .Where(i => i.MilestoneId == milestoneId)
+                .Select((issue, index) =>
+                {
+                    var endDate = issue.DueDate ?? milestone?.DueDate ?? today;
+                    var startDate = milestone?.StartDate ?? endDate.AddDays(-7);
+                    var progress = issue.State.Equals("closed", StringComparison.OrdinalIgnoreCase) ? 100 : 0;
 
-                return new GanttItemDto(
-                    Id: issue.Id == 0 ? index + 1 : issue.Id,
-                    Title: issue.Title,
-                    ViewMode: "milestone",
-                    Assignee: issue.AssigneeName,
-                    StartDate: startDate,
-                    EndDate: endDate,
-                    Progress: progress,
-                    MilestoneId: issue.MilestoneId,
-                    MilestoneTitle: issue.MilestoneTitle,
-                    TimeEstimateSeconds: issue.TimeEstimateSeconds,
-                    TotalTimeSpentSeconds: issue.TotalTimeSpentSeconds);
-            })
-            .ToList();
+                    return new GanttItemDto(
+                        Id: issue.Id == 0 ? index + 1 : issue.Id,
+                        Title: issue.Title,
+                        ViewMode: "milestone",
+                        Assignee: issue.AssigneeName,
+                        StartDate: startDate,
+                        EndDate: endDate,
+                        Progress: progress,
+                        MilestoneId: issue.MilestoneId,
+                        MilestoneTitle: issue.MilestoneTitle,
+                        TimeEstimateSeconds: issue.TimeEstimateSeconds,
+                        TotalTimeSpentSeconds: issue.TotalTimeSpentSeconds);
+                })
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to build gantt. groupId={GroupId}, milestoneId={MilestoneId}", groupId, milestoneId);
+            return [];
+        }
     }
 
     private static List<DashboardIssue> BuildDashboardIssues(IReadOnlyList<GitLabIssueDto> gitLabIssues)

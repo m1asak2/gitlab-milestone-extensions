@@ -121,6 +121,85 @@ public sealed class GitLabApiClientTests
         Assert.Equal("https://gitlab.example.local/groups/platform/-/milestones/301", milestone.WebUrl);
     }
 
+    [Fact]
+    public async Task GetProjectIssuesAsync_SkipsProjectWhenARequestFails()
+    {
+        var handler = new StubHttpMessageHandler(request =>
+        {
+            return request.RequestUri?.AbsolutePath switch
+            {
+                "/api/v4/projects/101/issues" => CreateJsonResponse(new[]
+                {
+                    new
+                    {
+                        id = 1001,
+                        iid = 11,
+                        title = "Healthy project issue",
+                        web_url = "https://gitlab.example.local/team/web/-/issues/11",
+                        state = "opened",
+                        due_date = "2026-03-20",
+                        milestone = (object?)null,
+                        assignee = (object?)null,
+                        assignees = Array.Empty<object>(),
+                        time_stats = new
+                        {
+                            time_estimate = 0,
+                            total_time_spent = 0,
+                            human_time_estimate = (string?)null,
+                            human_total_time_spent = (string?)null
+                        }
+                    }
+                }),
+                "/api/v4/projects/202/issues" => throw new HttpRequestException("The response ended prematurely."),
+                _ => throw new Xunit.Sdk.XunitException($"Unexpected request: {request.RequestUri}")
+            };
+        });
+
+        var client = CreateClient(handler);
+        var projects = new[]
+        {
+            new GitLabProjectDto(101, "Healthy", "https://gitlab.example.local/team/healthy"),
+            new GitLabProjectDto(202, "Broken", "https://gitlab.example.local/team/broken")
+        };
+
+        var issues = await client.GetProjectIssuesAsync(projects, CancellationToken.None);
+
+        var issue = Assert.Single(issues);
+        Assert.Equal(101, issue.ProjectId);
+        Assert.Equal("Healthy project issue", issue.Title);
+    }
+
+    [Fact]
+    public async Task GetProjectsAsync_SkipsGroupWhenARequestFails()
+    {
+        var handler = new StubHttpMessageHandler(request =>
+        {
+            return request.RequestUri?.AbsolutePath switch
+            {
+                "/api/v4/groups" => CreateJsonResponse(new[]
+                {
+                    new { id = 1, name = "Alpha", web_url = "https://gitlab.example.local/groups/alpha" },
+                    new { id = 2, name = "Beta", web_url = "https://gitlab.example.local/groups/beta" }
+                }),
+                "/api/v4/groups/1/projects" => CreateJsonResponse(new[]
+                {
+                    new { id = 101, name = "Healthy", web_url = "https://gitlab.example.local/team/healthy" }
+                }),
+                "/api/v4/groups/2/projects" => throw new TaskCanceledException("The operation was canceled."),
+                "/api/v4/projects" => CreateJsonResponse(Array.Empty<object>()),
+                _ => throw new Xunit.Sdk.XunitException($"Unexpected request: {request.RequestUri}")
+            };
+        });
+
+        var client = CreateClient(handler);
+
+        var projects = await client.GetProjectsAsync(null, CancellationToken.None);
+
+        var project = Assert.Single(projects);
+        Assert.Equal(101, project.ProjectId);
+        Assert.Equal("Healthy", project.ProjectName);
+    }
+
     private static GitLabApiClient CreateClient(HttpMessageHandler handler, IHttpContextAccessor? httpContextAccessor = null)
     {
         var httpClient = new HttpClient(handler);
