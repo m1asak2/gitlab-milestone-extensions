@@ -92,11 +92,17 @@
                                 value="@(_selectedMilestoneId?.ToString() ?? string.Empty)" @onchange="OnMilestoneChanged"
                                 disabled="@(_isLoadingSelectors || !SelectionState.HasPrivateToken)">
                             <option value="">Select Milestone</option>
-                            @foreach (var milestone in _milestones)
+                            @foreach (var milestone in VisibleMilestones)
                             {
-                                <option value="@milestone.MilestoneId">@milestone.MilestoneTitle</option>
+                                <option value="@milestone.MilestoneId">@milestone.DisplayLabel</option>
                             }
                         </select>
+                        <label class="selector-checkbox mt-2" for="closed-toggle">
+                            <input id="closed-toggle" type="checkbox" checked="@_hideClosedMilestones"
+                                   @onchange="OnHideClosedMilestonesChanged"
+                                   disabled="@(_isLoadingSelectors || !SelectionState.HasPrivateToken)" />
+                            <span>Closedを隠す</span>
+                        </label>
                     </MudItem>
                 </MudGrid>
 
@@ -131,11 +137,14 @@
     private int? _selectedMemberId;
     private int? _selectedProjectId;
     private int? _selectedMilestoneId;
+    private bool _hideClosedMilestones = true;
 
     private IReadOnlyList<SelectionGroupViewModel> _groups = [];
     private IReadOnlyList<SelectionMemberViewModel> _members = [];
     private IReadOnlyList<SelectionProjectViewModel> _projects = [];
     private IReadOnlyList<SelectionMilestoneViewModel> _milestones = [];
+    private IEnumerable<SelectionMilestoneViewModel> VisibleMilestones =>
+        _milestones.Where(m => !_hideClosedMilestones || !m.IsClosed || m.MilestoneId == _selectedMilestoneId);
 
     protected override async Task OnInitializedAsync()
     {
@@ -201,6 +210,12 @@
         _selectedMilestoneId = value;
         SelectionState.SetMilestone(value);
         return LoadSelectionOptionsAsync();
+    }
+
+    private Task OnHideClosedMilestonesChanged(ChangeEventArgs args)
+    {
+        _hideClosedMilestones = args.Value as bool? ?? false;
+        return InvokeAsync(StateHasChanged);
     }
 
     private void OnSelectionStateChanged()

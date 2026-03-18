@@ -68,8 +68,16 @@ public sealed record SelectionMilestoneViewModel(
     string MilestoneTitle,
     int ProjectId,
     string ProjectName,
+    string State,
     DateOnly? StartDate,
-    DateOnly? DueDate);
+    DateOnly? DueDate)
+{
+    public bool IsClosed => State.Equals("closed", StringComparison.OrdinalIgnoreCase);
+
+    public string DisplayLabel => IsClosed
+        ? $"{MilestoneTitle} - {ProjectName} [Closed]"
+        : $"{MilestoneTitle} - {ProjectName}";
+}
 
 public sealed record SelectionOptionsViewModel(
     IReadOnlyList<SelectionGroupViewModel> Groups,

@@ -46,6 +46,7 @@ public sealed record SelectorMilestoneDto(
     string MilestoneTitle,
     int ProjectId,
     string ProjectName,
+    string State,
     DateOnly? StartDate,
     DateOnly? DueDate);
 

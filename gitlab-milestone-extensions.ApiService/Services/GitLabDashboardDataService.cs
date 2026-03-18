@@ -91,9 +91,11 @@ public sealed class GitLabDashboardDataService(
                     m.Title,
                     m.ProjectId,
                     m.ProjectName,
+                    m.State,
                     m.StartDate,
                     m.DueDate))
-                .OrderBy(m => m.MilestoneTitle)
+                .OrderBy(m => IsClosedMilestoneState(m.State))
+                .ThenBy(m => m.MilestoneTitle)
                 .ToList();
 
             return new SelectionOptionsDto(groups, members, projects, milestones);
@@ -227,6 +229,9 @@ public sealed class GitLabDashboardDataService(
                 Id: i.Iid))
             .ToList();
     }
+
+    private static bool IsClosedMilestoneState(string state)
+        => state.Equals("closed", StringComparison.OrdinalIgnoreCase);
 
     private static string CoalesceHumanReadableDuration(string? humanDuration, int seconds)
     {

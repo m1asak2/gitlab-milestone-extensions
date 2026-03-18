@@ -31,10 +31,10 @@ public sealed class DummyDashboardDataService : IDashboardDataService
 
     private static readonly IReadOnlyList<SelectorMilestoneDto> Milestones =
     [
-        new SelectorMilestoneDto(201, "MVP Sprint 1", 10, "Dashboard.Api", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-7)), DateOnly.FromDateTime(DateTime.UtcNow.AddDays(7))),
-        new SelectorMilestoneDto(202, "MVP Sprint 2", 10, "Dashboard.Api", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(8)), DateOnly.FromDateTime(DateTime.UtcNow.AddDays(21))),
-        new SelectorMilestoneDto(301, "Group Planning", 4, "Default Group", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-3)), DateOnly.FromDateTime(DateTime.UtcNow.AddDays(10))),
-        new SelectorMilestoneDto(401, "Standalone Milestone", 12, "Standalone.Tools", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-2)), DateOnly.FromDateTime(DateTime.UtcNow.AddDays(14)))
+        new SelectorMilestoneDto(201, "MVP Sprint 1", 10, "Dashboard.Api", "active", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-7)), DateOnly.FromDateTime(DateTime.UtcNow.AddDays(7))),
+        new SelectorMilestoneDto(202, "MVP Sprint 2", 10, "Dashboard.Api", "closed", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(8)), DateOnly.FromDateTime(DateTime.UtcNow.AddDays(21))),
+        new SelectorMilestoneDto(301, "Group Planning", 4, "Default Group", "active", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-3)), DateOnly.FromDateTime(DateTime.UtcNow.AddDays(10))),
+        new SelectorMilestoneDto(401, "Standalone Milestone", 12, "Standalone.Tools", "closed", DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-2)), DateOnly.FromDateTime(DateTime.UtcNow.AddDays(14)))
     ];
 
     public Task<SelectionOptionsDto> GetSelectionOptionsAsync(
