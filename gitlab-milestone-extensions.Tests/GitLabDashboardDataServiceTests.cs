@@ -23,6 +23,45 @@ public sealed class GitLabDashboardDataServiceTests
         Assert.Equal(3600, result.ActualSeconds);
     }
 
+
+    [Fact]
+    public async Task GetIssuesAsync_UsesGitLabWorkdayConversionWhenHumanDurationMissing()
+    {
+        var snapshot = CreateSnapshot() with
+        {
+            Issues =
+            [
+                new GitLabIssueDto(
+                    ProjectId: 11,
+                    ProjectName: "Web",
+                    ProjectWebUrl: "https://gitlab.example.local/team/web",
+                    IssueId: 1003,
+                    Iid: 103,
+                    Title: "Convert duration format",
+                    WebUrl: "https://gitlab.example.local/team/web/-/issues/103",
+                    State: "opened",
+                    MilestoneId: 201,
+                    MilestoneTitle: "Sprint 1",
+                    AssigneeId: 3,
+                    AssigneeName: "Charlie",
+                    DueDate: new DateOnly(2026, 3, 25),
+                    TimeEstimateSeconds: 144000,
+                    TotalTimeSpentSeconds: 31800,
+                    HumanTimeEstimate: null,
+                    HumanTotalTimeSpent: null)
+            ]
+        };
+
+        var service = new GitLabDashboardDataService(
+            new StubSnapshotService(snapshot),
+            NullLogger<GitLabDashboardDataService>.Instance);
+
+        var issues = await service.GetIssuesAsync(null, 201, CancellationToken.None);
+
+        var issue = Assert.Single(issues);
+        Assert.Equal("1w", issue.HumanTimeEstimate);
+        Assert.Equal("1d 50m", issue.HumanTotalTimeSpent);
+    }
     [Fact]
     public async Task GetIssuesAsync_MapsIssueAndProjectUrls()
     {
