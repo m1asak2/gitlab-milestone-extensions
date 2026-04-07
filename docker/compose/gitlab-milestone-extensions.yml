@@ -1,0 +1,37 @@
+# Save the output of this file and use kubectl create -f to import
+# it into Kubernetes.
+#
+# Created with podman-4.9.4-rhel
+
+# NOTE: The namespace sharing for a pod has been modified by the user and is not the same as the
+# default settings for kubernetes. This can lead to unexpected behavior when running the generated
+# kube yaml in a kubernetes cluster.
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: "2026-04-07T00:51:52Z"
+  labels:
+    app: podcompose
+  name: podcompose
+spec:
+  containers:
+  - env:
+    - name: ASPNETCORE_ENVIRONMENT
+      value: Production
+    - name: GitLab__BaseUrl
+      value: http://maria220.nis-md.net/gitlab
+    image: localhost/compose_api:latest
+    name: composeapi1
+  - args:
+    - nginx
+    - -g
+    - daemon off;
+    image: localhost/compose_web:latest
+    name: composeweb1
+    ports:
+    - containerPort: 8080
+      hostPort: 8080
+    securityContext:
+      runAsNonRoot: true
+
