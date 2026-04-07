@@ -245,21 +245,45 @@ public sealed class GitLabDashboardDataService(
             return "0m";
         }
 
-        var span = TimeSpan.FromSeconds(seconds);
-        var days = (int)span.TotalDays;
-        var hours = span.Hours;
-        var minutes = span.Minutes;
+        const int secondsPerMinute = 60;
+        const int minutesPerHour = 60;
+        const int hoursPerDay = 8;
+        const int daysPerWeek = 5;
+
+        var totalMinutes = seconds / secondsPerMinute;
+        var minutesPerDay = hoursPerDay * minutesPerHour;
+        var minutesPerWeek = daysPerWeek * minutesPerDay;
+
+        var weeks = totalMinutes / minutesPerWeek;
+        totalMinutes %= minutesPerWeek;
+
+        var days = totalMinutes / minutesPerDay;
+        totalMinutes %= minutesPerDay;
+
+        var hours = totalMinutes / minutesPerHour;
+        var minutes = totalMinutes % minutesPerHour;
+
+        var parts = new List<string>(4);
+        if (weeks > 0)
+        {
+            parts.Add($"{weeks}w");
+        }
 
         if (days > 0)
         {
-            return $"{days}d {hours}h";
+            parts.Add($"{days}d");
         }
 
         if (hours > 0)
         {
-            return $"{hours}h {minutes}m";
+            parts.Add($"{hours}h");
         }
 
-        return $"{minutes}m";
+        if (minutes > 0)
+        {
+            parts.Add($"{minutes}m");
+        }
+
+        return parts.Count == 0 ? "0m" : string.Join(' ', parts);
     }
 }
