@@ -20,7 +20,7 @@ spec:
     - name: ASPNETCORE_ENVIRONMENT
       value: Production
     - name: GitLab__BaseUrl
-      value: http://maria220.nis-md.net/gitlab
+      value: http://gitlab-vm.apps.ocp.design.intra
     image: localhost/compose_api:latest
     name: composeapi1
   - args:
