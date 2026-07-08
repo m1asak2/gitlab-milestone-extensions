@@ -6,6 +6,6 @@
     }
   },
   "GitLab": {
-    "BaseUrl": "http://gitlab.local"
+    "BaseUrl": "http://gitlab-vm.apps.ocp.design.intra"
   }
 }

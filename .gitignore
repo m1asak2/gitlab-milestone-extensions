@@ -12,4 +12,8 @@ tmp
 FolderProfile.pubxml.user
 *.log
 artifacts
-gitlab-milestone-extensions.ApiService/.appsettings.Development.json
+appsettings.Development.json
+appsettings.json
+.env
+/docker/compose/.env
+/gitlab-milestone-extensions.Web/wwwroot/appsettings.Development.json
