@@ -17,3 +17,4 @@ appsettings.json
 .env
 /docker/compose/.env
 /gitlab-milestone-extensions.Web/wwwroot/appsettings.Development.json
+/gitlab-milestone-extensions.ApiService/appsettings.json.template
