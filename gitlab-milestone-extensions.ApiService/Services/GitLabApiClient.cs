@@ -2,8 +2,10 @@ using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
+
 using gitlab_milestone_extensions.ApiService.Models;
 using gitlab_milestone_extensions.ApiService.Options;
+
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 
