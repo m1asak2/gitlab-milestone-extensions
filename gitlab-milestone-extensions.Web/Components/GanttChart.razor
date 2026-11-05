@@ -16,7 +16,7 @@
 else
 {
     <div class="gantt-scroll">
-        <div class="gantt-board" style="@($"--gantt-columns:{_columns.Count};--gantt-cell:{CellWidth}px")">
+        <div class="gantt-board" style="@($"--gantt-cell:{CellWidth}px;--gantt-width:{_columns.Count * CellWidth}px")">
             <div class="gantt-label gantt-heading">Project / Issue</div>
             <div class="gantt-timeline gantt-heading">
                 @foreach (var column in _columns)
@@ -120,7 +120,7 @@ else
 
     private double ColumnPosition(DateOnly date)
     {
-        if (_scale == "day") return date.DayNumber - _origin.DayNumber is var days ? days * CellWidth : 0;
+        if (_scale == "day") return (date.DayNumber - _origin.DayNumber) * CellWidth;
         if (_scale == "week") return (date.DayNumber - _origin.DayNumber) / 7.0 * CellWidth;
         var months = (date.Year - _origin.Year) * 12 + date.Month - _origin.Month;
         var daysInMonth = DateTime.DaysInMonth(date.Year, date.Month);
