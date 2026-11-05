@@ -177,18 +177,18 @@ public sealed class GitLabDashboardDataService(
             var milestone = snapshot.Milestones.FirstOrDefault(m => m.MilestoneId == milestoneId);
             var today = DateOnly.FromDateTime(DateTime.Today);
 
-            return BuildDashboardIssues(snapshot.Issues)
+            return snapshot.Issues
                 .Where(i => i.MilestoneId == milestoneId)
                 .Select((issue, index) =>
                 {
-                    var startDate = milestone?.StartDate;
+                    var startDate = issue.StartDate;
                     var endDate = issue.DueDate ?? milestone?.DueDate;
                     var valid = startDate.HasValue && endDate.HasValue && startDate.Value <= endDate.Value;
                     return new GanttItemDto(
-                        Id: issue.Id == 0 ? index + 1 : issue.Id,
+                        Id: issue.Iid == 0 ? index + 1 : issue.Iid,
                         Title: issue.Title,
                         ViewMode: "issue",
-                        Assignee: issue.AssigneeName,
+                        Assignee: issue.AssigneeName ?? string.Empty,
                         StartDate: startDate ?? today,
                         EndDate: endDate ?? startDate ?? today,
                         Progress: issue.State.Equals("closed", StringComparison.OrdinalIgnoreCase) ? 100 : 0,
@@ -198,8 +198,8 @@ public sealed class GitLabDashboardDataService(
                         TotalTimeSpentSeconds: issue.TotalTimeSpentSeconds,
                         ProjectId: issue.ProjectId,
                         ProjectName: issue.ProjectName,
-                        IssueUrl: issue.IssueUrl,
-                        StartDateInferred: true,
+                        IssueUrl: issue.WebUrl,
+                        StartDateInferred: false,
                         EndDateInferred: !issue.DueDate.HasValue,
                         HasValidDates: valid);
                 })

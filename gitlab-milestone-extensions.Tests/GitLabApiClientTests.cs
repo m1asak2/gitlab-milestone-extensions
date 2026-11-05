@@ -13,6 +13,24 @@ namespace gitlab_milestone_extensions.Tests;
 
 public sealed class GitLabApiClientTests
 {
+    [Theory]
+    [InlineData("2026-03-05")]
+    [InlineData(null)]
+    public async Task GetProjectIssuesAsync_MapsIssueStartDate(string? startDate)
+    {
+        var handler = new StubHttpMessageHandler(_ => CreateJsonResponse(new[]
+        {
+            new { id = 1001, iid = 101, title = "Scheduled issue", state = "opened",
+                start_date = startDate, due_date = "2026-03-15" }
+        }));
+        var client = CreateClient(handler);
+
+        var issue = Assert.Single(await client.GetProjectIssuesAsync(
+            new[] { new GitLabProjectDto(11, "Web", null) }, CancellationToken.None));
+
+        Assert.Equal(startDate is null ? (DateOnly?)null : new DateOnly(2026, 3, 5), issue.StartDate);
+    }
+
     [Fact]
     public async Task GetCurrentUserAsync_UsesPrivateTokenAndReturnsUser()
     {

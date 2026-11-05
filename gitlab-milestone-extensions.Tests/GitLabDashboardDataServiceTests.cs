@@ -6,6 +6,51 @@ namespace gitlab_milestone_extensions.Tests;
 
 public sealed class GitLabDashboardDataServiceTests
 {
+    [Theory]
+    [InlineData(5, 15, true)]
+    [InlineData(10, 20, true)]
+    [InlineData(null, 15, false)]
+    [InlineData(20, 15, false)]
+    [InlineData(5, null, true)]
+    public async Task GetGanttAsync_UsesIssueStartDateInsteadOfMilestone(int? startDay, int? endDay, bool valid)
+    {
+        var original = CreateSnapshot();
+        var issue = original.Issues[0] with
+        {
+            StartDate = startDay.HasValue ? new DateOnly(2026, 3, startDay.Value) : null,
+            DueDate = endDay.HasValue ? new DateOnly(2026, 3, endDay.Value) : null
+        };
+        var service = new GitLabDashboardDataService(
+            new StubSnapshotService(original with { Issues = [issue] }),
+            NullLogger<GitLabDashboardDataService>.Instance);
+
+        var item = Assert.Single(await service.GetGanttAsync(null, 201, CancellationToken.None));
+
+        Assert.Equal(valid, item.HasValidDates);
+        Assert.False(item.StartDateInferred);
+        Assert.Equal(!endDay.HasValue, item.EndDateInferred);
+        if (startDay.HasValue) Assert.Equal(issue.StartDate, item.StartDate);
+        Assert.Equal(issue.DueDate ?? original.Milestones[0].DueDate, item.EndDate);
+    }
+
+    [Fact]
+    public async Task GetGanttAsync_PreservesDifferentIssueStartDatesInSameMilestone()
+    {
+        var original = CreateSnapshot();
+        var snapshot = original with
+        {
+            Issues = [original.Issues[0] with { StartDate = new DateOnly(2026, 3, 5) },
+                      original.Issues[1] with { StartDate = new DateOnly(2026, 3, 10) }]
+        };
+        var service = new GitLabDashboardDataService(new StubSnapshotService(snapshot),
+            NullLogger<GitLabDashboardDataService>.Instance);
+
+        var items = await service.GetGanttAsync(null, 201, CancellationToken.None);
+
+        Assert.Equal(new[] { new DateOnly(2026, 3, 5), new DateOnly(2026, 3, 10) }, items.Select(i => i.StartDate));
+        Assert.All(items, item => Assert.True(item.HasValidDates));
+    }
+
     [Fact]
     public async Task GetDashboardAsync_ReturnsMilestoneWebUrl()
     {

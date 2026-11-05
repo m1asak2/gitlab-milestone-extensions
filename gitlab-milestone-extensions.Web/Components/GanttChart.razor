@@ -53,7 +53,7 @@ else
                                 var right = ColumnPosition(item.EndDate.AddDays(1));
                                 <div class="gantt-bar @(item.Progress == 100 ? "gantt-done" : "") @(item.StartDateInferred || item.EndDateInferred ? "gantt-inferred" : "")"
                                      style="@($"left:{left}px;width:{Math.Max(3, right-left)}px")"
-                                     title="@($"{item.Title}: {item.StartDate:yyyy-MM-dd} ～ {item.EndDate:yyyy-MM-dd} / {item.Progress}% (開始日: マイルストーン由来{(item.EndDateInferred ? "、終了日: マイルストーン由来" : "")})")">
+                                     title="@($"{item.Title}: {item.StartDate:yyyy-MM-dd} ～ {item.EndDate:yyyy-MM-dd} / {item.Progress}% (開始日: {(item.StartDateInferred ? "推定" : "Issue")}{(item.EndDateInferred ? "、終了日: マイルストーン由来" : "")})")">
                                     <div class="gantt-progress" style="@($"width:{item.Progress}%")"></div>
                                 </div>
                             }

@@ -279,7 +279,8 @@ public class GitLabApiClient
                     i.TimeStats?.TimeEstimate ?? 0,
                     i.TimeStats?.TotalTimeSpent ?? 0,
                     i.TimeStats?.HumanTimeEstimate,
-                    i.TimeStats?.HumanTotalTimeSpent));
+                    i.TimeStats?.HumanTotalTimeSpent,
+                    i.StartDate));
             },
             itemDescription: project => $"project issues ProjectId={project.ProjectId}, ProjectName={project.ProjectName}",
             cancellationToken);
@@ -486,6 +487,7 @@ public class GitLabApiClient
         [property: JsonPropertyName("due_date")] DateOnly? DueDate);
 
     private sealed record GitLabIssueResponse(
+        [property: JsonPropertyName("start_date")] DateOnly? StartDate,
         [property: JsonPropertyName("id")] int Id,
         [property: JsonPropertyName("iid")] int Iid,
         [property: JsonPropertyName("title")] string Title,
