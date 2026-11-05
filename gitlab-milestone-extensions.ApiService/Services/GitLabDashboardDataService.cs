@@ -181,22 +181,27 @@ public sealed class GitLabDashboardDataService(
                 .Where(i => i.MilestoneId == milestoneId)
                 .Select((issue, index) =>
                 {
-                    var endDate = issue.DueDate ?? milestone?.DueDate ?? today;
-                    var startDate = milestone?.StartDate ?? endDate.AddDays(-7);
-                    var progress = issue.State.Equals("closed", StringComparison.OrdinalIgnoreCase) ? 100 : 0;
-
+                    var startDate = milestone?.StartDate;
+                    var endDate = issue.DueDate ?? milestone?.DueDate;
+                    var valid = startDate.HasValue && endDate.HasValue && startDate.Value <= endDate.Value;
                     return new GanttItemDto(
                         Id: issue.Id == 0 ? index + 1 : issue.Id,
                         Title: issue.Title,
-                        ViewMode: "milestone",
+                        ViewMode: "issue",
                         Assignee: issue.AssigneeName,
-                        StartDate: startDate,
-                        EndDate: endDate,
-                        Progress: progress,
+                        StartDate: startDate ?? today,
+                        EndDate: endDate ?? startDate ?? today,
+                        Progress: issue.State.Equals("closed", StringComparison.OrdinalIgnoreCase) ? 100 : 0,
                         MilestoneId: issue.MilestoneId,
                         MilestoneTitle: issue.MilestoneTitle,
                         TimeEstimateSeconds: issue.TimeEstimateSeconds,
-                        TotalTimeSpentSeconds: issue.TotalTimeSpentSeconds);
+                        TotalTimeSpentSeconds: issue.TotalTimeSpentSeconds,
+                        ProjectId: issue.ProjectId,
+                        ProjectName: issue.ProjectName,
+                        IssueUrl: issue.IssueUrl,
+                        StartDateInferred: true,
+                        EndDateInferred: !issue.DueDate.HasValue,
+                        HasValidDates: valid);
                 })
                 .ToList();
         }
