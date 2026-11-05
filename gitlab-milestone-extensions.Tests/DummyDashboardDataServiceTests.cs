@@ -5,6 +5,31 @@ namespace gitlab_milestone_extensions.Tests;
 public sealed class DummyDashboardDataServiceTests
 {
     [Fact]
+    public async Task GetGanttAsync_ReturnsIssueMetadataAndDateStatus()
+    {
+        var service = new DummyDashboardDataService();
+        var issues = await service.GetIssuesAsync(null, 201, CancellationToken.None);
+
+        var items = await service.GetGanttAsync(null, 201, CancellationToken.None);
+
+        Assert.Equal(issues.Count, items.Count);
+        Assert.All(items, item =>
+        {
+            var issue = Assert.Single(issues, issue => issue.Id == item.Id);
+            Assert.Equal("issue", item.ViewMode);
+            Assert.Equal(issue.ProjectId, item.ProjectId);
+            Assert.Equal(issue.ProjectName, item.ProjectName);
+            Assert.Equal(issue.IssueUrl, item.IssueUrl);
+            Assert.Equal(issue.MilestoneId, item.MilestoneId);
+            Assert.Equal(issue.DueDate, item.EndDate);
+            Assert.True(item.StartDateInferred);
+            Assert.False(item.EndDateInferred);
+            Assert.Equal(item.StartDate <= item.EndDate, item.HasValidDates);
+            Assert.Equal(issue.State == "closed" ? 100 : 0, item.Progress);
+        });
+    }
+
+    [Fact]
     public async Task GetSelectionOptionsAsync_WithoutGroupSelection_ReturnsProjectsForDirectSelection()
     {
         var service = new DummyDashboardDataService();

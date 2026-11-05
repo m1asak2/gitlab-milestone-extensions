@@ -147,21 +147,30 @@ public sealed class DummyDashboardDataService : IDashboardDataService
     public Task<IReadOnlyList<GanttItemDto>> GetGanttAsync(int? groupId, int milestoneId, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var startDate = today.AddDays(-2);
+        var fallbackEndDate = today.AddDays(2);
 
         var items = Issues
             .Where(i => i.MilestoneId == milestoneId)
             .Select(i => new GanttItemDto(
                 i.Id,
                 i.Title,
-                "milestone",
+                "issue",
                 i.AssigneeName,
-                DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-2)),
-                i.DueDate ?? DateOnly.FromDateTime(DateTime.UtcNow.AddDays(2)),
+                startDate,
+                i.DueDate ?? fallbackEndDate,
                 i.State.Equals("closed", StringComparison.OrdinalIgnoreCase) ? 100 : 0,
                 i.MilestoneId,
                 i.MilestoneTitle,
                 i.TimeEstimateSeconds,
-                i.TotalTimeSpentSeconds))
+                i.TotalTimeSpentSeconds,
+                i.ProjectId,
+                i.ProjectName,
+                i.IssueUrl,
+                StartDateInferred: true,
+                EndDateInferred: !i.DueDate.HasValue,
+                HasValidDates: startDate <= (i.DueDate ?? fallbackEndDate)))
             .ToList();
 
         return Task.FromResult<IReadOnlyList<GanttItemDto>>(items);

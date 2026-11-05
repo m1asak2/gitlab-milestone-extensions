@@ -1,0 +1,136 @@
+@using gitlab_milestone_extensions.Web.Models
+@using MudBlazor
+
+<div class="gantt-controls">
+    <MudSelect T="string" Label="表示単位" Value="_scale" ValueChanged="ChangeScale" Dense="true" Style="max-width:180px">
+        <MudSelectItem Value="@("day")">日</MudSelectItem>
+        <MudSelectItem Value="@("week")">週</MudSelectItem>
+        <MudSelectItem Value="@("month")">月</MudSelectItem>
+    </MudSelect>
+</div>
+
+@if (Items.Count == 0)
+{
+    <MudText>表示するIssueがありません。</MudText>
+}
+else
+{
+    <div class="gantt-scroll">
+        <div class="gantt-board" style="@($"--gantt-cell:{CellWidth}px;--gantt-width:{_columns.Count * CellWidth}px")">
+            <div class="gantt-label gantt-heading">Project / Issue</div>
+            <div class="gantt-timeline gantt-heading">
+                @foreach (var column in _columns)
+                {
+                    <div class="gantt-date">@ColumnLabel(column)</div>
+                }
+            </div>
+            @foreach (var group in Items.GroupBy(x => x.ProjectId).OrderBy(x => x.First().ProjectName))
+            {
+                var expanded = !_collapsed.Contains(group.Key);
+                <button class="gantt-label gantt-project" @onclick="() => Toggle(group.Key)">
+                    @(expanded ? "▾" : "▸") @group.First().ProjectName (@group.Count())
+                </button>
+                <div class="gantt-timeline gantt-project-line"></div>
+                @if (expanded)
+                {
+                    @foreach (var item in group.OrderBy(x => x.StartDate).ThenBy(x => x.Title))
+                    {
+                        <div class="gantt-label gantt-issue">
+                            @if (!string.IsNullOrWhiteSpace(item.IssueUrl))
+                            {
+                                <a href="@item.IssueUrl" target="_blank" rel="noopener noreferrer" title="@item.Title">@item.Title</a>
+                            }
+                            else
+                            {
+                                <span title="@item.Title">@item.Title</span>
+                            }
+                            <small>@item.Assignee</small>
+                        </div>
+                        <div class="gantt-timeline gantt-row">
+                            @if (item.HasValidDates)
+                            {
+                                var left = ColumnPosition(item.StartDate);
+                                var right = ColumnPosition(item.EndDate.AddDays(1));
+                                <div class="gantt-bar @(item.Progress == 100 ? "gantt-done" : "") @(item.StartDateInferred || item.EndDateInferred ? "gantt-inferred" : "")"
+                                     style="@($"left:{left}px;width:{Math.Max(3, right-left)}px")"
+                                     title="@($"{item.Title}: {item.StartDate:yyyy-MM-dd} ～ {item.EndDate:yyyy-MM-dd} / {item.Progress}% (開始日: マイルストーン由来{(item.EndDateInferred ? "、終了日: マイルストーン由来" : "")})")">
+                                    <div class="gantt-progress" style="@($"width:{item.Progress}%")"></div>
+                                </div>
+                            }
+                            else
+                            {
+                                <span class="gantt-no-date">日程未設定・不正</span>
+                            }
+                        </div>
+                    }
+                }
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public IReadOnlyList<GanttItemViewModel> Items { get; set; } = [];
+    private readonly HashSet<int> _collapsed = [];
+    private string _scale = "week";
+    private List<DateOnly> _columns = [];
+    private DateOnly _origin;
+    private int CellWidth => _scale switch { "day" => 34, "month" => 110, _ => 90 };
+
+    protected override void OnParametersSet() => BuildColumns();
+
+    private Task ChangeScale(string value)
+    {
+        _scale = value;
+        BuildColumns();
+        return Task.CompletedTask;
+    }
+
+    private void Toggle(int projectId)
+    {
+        if (!_collapsed.Add(projectId)) _collapsed.Remove(projectId);
+    }
+
+    private DateOnly Floor(DateOnly date) => _scale switch
+    {
+        "month" => new DateOnly(date.Year, date.Month, 1),
+        "week" => date.AddDays(-((int)date.DayOfWeek + 6) % 7),
+        _ => date
+    };
+
+    private DateOnly Next(DateOnly date) => _scale switch
+    {
+        "month" => date.AddMonths(1),
+        "week" => date.AddDays(7),
+        _ => date.AddDays(1)
+    };
+
+    private void BuildColumns()
+    {
+        var valid = Items.Where(x => x.HasValidDates).ToList();
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var min = valid.Count > 0 ? valid.Min(x => x.StartDate) : today;
+        var max = valid.Count > 0 ? valid.Max(x => x.EndDate) : today;
+        _origin = Floor(min);
+        _columns = [];
+        for (var date = _origin; date <= max && _columns.Count < 1000; date = Next(date))
+            _columns.Add(date);
+        if (_columns.Count == 0) _columns.Add(_origin);
+    }
+
+    private double ColumnPosition(DateOnly date)
+    {
+        if (_scale == "day") return (date.DayNumber - _origin.DayNumber) * CellWidth;
+        if (_scale == "week") return (date.DayNumber - _origin.DayNumber) / 7.0 * CellWidth;
+        var months = (date.Year - _origin.Year) * 12 + date.Month - _origin.Month;
+        var daysInMonth = DateTime.DaysInMonth(date.Year, date.Month);
+        return (months + (date.Day - 1.0) / daysInMonth) * CellWidth;
+    }
+
+    private string ColumnLabel(DateOnly date) => _scale switch
+    {
+        "month" => date.ToString("yyyy/MM"),
+        "week" => date.ToString("MM/dd"),
+        _ => date.ToString("dd")
+    };
+}
