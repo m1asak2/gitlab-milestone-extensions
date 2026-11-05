@@ -12,10 +12,8 @@ public sealed class GitLabLiveSmokeTests
     public async Task SelectionOptionsEndpoint_ReturnsSuccessAgainstLiveGitLab()
     {
         var privateToken = Environment.GetEnvironmentVariable(PrivateTokenEnvVar);
-        if (string.IsNullOrWhiteSpace(privateToken))
-        {
-            return;
-        }
+        Assert.SkipUnless(!string.IsNullOrWhiteSpace(privateToken),
+            "LIVE_GITLAB_TOKEN is not configured; live GitLab validation was not run.");
 
         var cancellationToken = TestContext.Current.CancellationToken;
         var appHost = await DistributedApplicationTestingBuilder.CreateAsync<Projects.gitlab_milestone_extensions_AppHost>(cancellationToken);

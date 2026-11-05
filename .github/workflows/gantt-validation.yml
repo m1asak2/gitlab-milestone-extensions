@@ -1,20 +1,35 @@
 name: Validate Gantt PR
 on:
   push:
-    branches: [feature/issue-gantt-chart]
+    branches: [main, feature/issue-gantt-chart]
   pull_request:
     branches: [main]
 jobs:
   build-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+      - name: Trust local HTTPS development certificate
+        shell: bash
+        run: |
+          export SSL_CERT_DIR="$HOME/.aspnet/dev-certs/trust:/usr/lib/ssl/certs"
+          echo "SSL_CERT_DIR=$SSL_CERT_DIR" >> "$GITHUB_ENV"
+          dotnet dev-certs https --trust
+          dotnet dev-certs https --check --trust
       - name: Restore
         run: dotnet restore gitlab-milestone-extensions.slnx
       - name: Build
         run: dotnet build gitlab-milestone-extensions.slnx --no-restore --configuration Release
       - name: Test
-        run: dotnet test gitlab-milestone-extensions.slnx --no-build --configuration Release
+        run: dotnet test gitlab-milestone-extensions.slnx --no-build --configuration Release --logger "trx;LogFileName=tests.trx" --results-directory TestResults --blame-hang --blame-hang-timeout 3m
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults/
+          if-no-files-found: ignore
