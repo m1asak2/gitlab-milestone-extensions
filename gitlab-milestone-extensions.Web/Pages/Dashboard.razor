@@ -205,26 +205,7 @@ else
                     </MudItem>
                 </MudGrid>
 
-                <MudTable Items="_filteredGanttItems">
-                    <HeaderContent>
-                        <MudTh>Title</MudTh>
-                        <MudTh>Mode</MudTh>
-                        <MudTh>Assignee</MudTh>
-                        <MudTh>Start</MudTh>
-                        <MudTh>End</MudTh>
-                        <MudTh>Progress</MudTh>
-                    </HeaderContent>
-                    <RowTemplate>
-                        <MudTd DataLabel="Title">@context.Title</MudTd>
-                        <MudTd DataLabel="Mode">@context.ViewMode</MudTd>
-                        <MudTd DataLabel="Assignee">@context.Assignee</MudTd>
-                        <MudTd DataLabel="Start">@context.StartDate.ToString("yyyy-MM-dd")</MudTd>
-                        <MudTd DataLabel="End">@context.EndDate.ToString("yyyy-MM-dd")</MudTd>
-                        <MudTd DataLabel="Progress">
-                            <MudProgressLinear Color="Color.Secondary" Value="@context.Progress" />
-                        </MudTd>
-                    </RowTemplate>
-                </MudTable>
+                <GanttChart Items="_filteredGanttItems" />
             </MudTabPanel>
         </MudTabs>
     }
