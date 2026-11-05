@@ -141,4 +141,10 @@ public sealed record GanttItemDto(
     int? MilestoneId,
     string? MilestoneTitle,
     int TimeEstimateSeconds,
-    int TotalTimeSpentSeconds);
+    int TotalTimeSpentSeconds,
+    int ProjectId,
+    string ProjectName,
+    string? IssueUrl,
+    bool StartDateInferred,
+    bool EndDateInferred,
+    bool HasValidDates);
