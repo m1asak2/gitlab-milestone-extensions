@@ -1,0 +1,48 @@
+workflow:
+  rules:
+    - if: '($CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == $DEV_DEPLOY_BRANCH)'
+    - when: never  
+stages:
+  - prepare-runtime
+  - prepare-test
+  - test
+  - build-api
+  - build-web
+  - deploy-api
+  - deploy-web
+include:
+  - project: "infrastructure_automation/ci-cd-templates"
+    file:
+      - buildah/build-buildah.yml
+      - deploy/deploy-openshift.yml
+
+build-api-image:
+  extends: .build-buildah
+  stage: build-api
+  variables:
+    NAMESPACE: "gitlab-extension"
+    CONTAINERFILE: "Containerfile.api"
+    IMAGE_NAME: "api"
+build-web-image:
+  extends: .build-buildah
+  stage: build-web
+  variables:
+    NAMESPACE: "gitlab-extension"
+    CONTAINERFILE: "Containerfile.web"
+    IMAGE_NAME: "web"
+deploy-api:
+  extends: .deploy-openshift
+  stage: deploy-api
+  variables:
+    CONTAINER_NAME: "api"
+    DEPLOYMENT_NAME: "api"
+    IMAGE_NAME: "api"
+    NAMESPACE: "gitlab-extension"
+deploy-web:
+  extends: .deploy-openshift
+  stage: deploy-web
+  variables:
+    CONTAINER_NAME: "web"
+    DEPLOYMENT_NAME: "web"
+    IMAGE_NAME: "web"
+    NAMESPACE: "gitlab-extension"
