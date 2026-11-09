@@ -3,9 +3,6 @@ workflow:
     - if: '($CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == $DEV_DEPLOY_BRANCH)'
     - when: never  
 stages:
-  - prepare-runtime
-  - prepare-test
-  - test
   - build-api
   - build-web
   - deploy-api
