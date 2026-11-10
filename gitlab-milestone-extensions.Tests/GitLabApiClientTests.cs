@@ -13,6 +13,44 @@ namespace gitlab_milestone_extensions.Tests;
 
 public sealed class GitLabApiClientTests
 {
+    [Fact]
+    public async Task ActualStarts_VerifiesClosingTargetsAndChoosesEarliestAcrossPages()
+    {
+        var handler = new StubHttpMessageHandler(request =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            if (path.EndsWith("related_merge_requests"))
+            {
+                if (request.RequestUri.Query.Contains("page=2")) return CreateJsonResponse(new[] { new { project_id = 12, iid = 3, created_at = "2026-03-05T23:30:00Z" } });
+                var response = CreateJsonResponse(new[] {
+                    new { project_id = 12, iid = 1, created_at = "2026-03-01T00:00:00Z" },
+                    new { project_id = 12, iid = 2, created_at = "2026-03-08T00:00:00Z" } });
+                response.Headers.Add("X-Next-Page", "2");
+                return response;
+            }
+            if (path.Contains("/merge_requests/1/")) return CreateJsonResponse(new[] { new { project_id = 99, iid = 101, id = 1001 } });
+            return CreateJsonResponse(new[] { new { project_id = 11, iid = 101, id = 1001 } });
+        });
+        var client = CreateClient(handler);
+        var issue = new GitLabIssueDto(11, "Web", null, 1001, 101, "Issue", null, "opened", 201, "Sprint", null, null, null, 0, 0, null, null);
+
+        var starts = await client.GetActualStartsAsync([issue], CancellationToken.None);
+
+        Assert.Equal(DateTimeOffset.Parse("2026-03-05T23:30:00Z"), starts[(11, 101)]);
+    }
+
+    [Theory]
+    [InlineData(401)]
+    [InlineData(403)]
+    [InlineData(404)]
+    public async Task ActualStarts_ReportsApiFailuresInsteadOfMissingData(int status)
+    {
+        var client = CreateClient(new StubHttpMessageHandler(_ => new HttpResponseMessage((HttpStatusCode)status)));
+        var issue = new GitLabIssueDto(11, "Web", null, 1001, 101, "Issue", null, "opened", 201, "Sprint", null, null, null, 0, 0, null, null);
+        var error = await Assert.ThrowsAsync<HttpRequestException>(() => client.GetActualStartsAsync([issue], CancellationToken.None));
+        Assert.Equal((HttpStatusCode)status, error.StatusCode);
+    }
+
     [Theory]
     [InlineData("2026-03-05")]
     [InlineData(null)]

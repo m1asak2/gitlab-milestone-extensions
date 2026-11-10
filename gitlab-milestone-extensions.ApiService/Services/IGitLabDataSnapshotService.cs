@@ -6,6 +6,9 @@ public interface IGitLabDataSnapshotService
 {
     Task<IReadOnlyList<GitLabGroupDto>> GetAccessibleGroupsAsync(CancellationToken cancellationToken);
 
+    Task<IReadOnlyDictionary<(int ProjectId, int Iid), DateTimeOffset?>> GetActualStartsAsync(
+        IReadOnlyList<GitLabIssueDto> issues, CancellationToken cancellationToken);
+
     Task<GitLabDataSnapshot> GetSnapshotAsync(int? groupId, CancellationToken cancellationToken);
 }
 

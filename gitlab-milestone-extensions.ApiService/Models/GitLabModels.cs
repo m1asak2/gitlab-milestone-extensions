@@ -47,4 +47,5 @@ public sealed record GitLabIssueDto(
     int TotalTimeSpentSeconds,
     string? HumanTimeEstimate,
     string? HumanTotalTimeSpent,
-    DateOnly? StartDate = null);
+    DateOnly? StartDate = null,
+    DateTimeOffset? ClosedAt = null);

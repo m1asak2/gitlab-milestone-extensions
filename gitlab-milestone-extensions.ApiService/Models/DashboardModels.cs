@@ -147,4 +147,10 @@ public sealed record GanttItemDto(
     string? IssueUrl,
     bool StartDateInferred,
     bool EndDateInferred,
-    bool HasValidDates);
+    bool HasValidDates,
+    DateOnly? PlannedStartDate = null,
+    DateOnly? PlannedEndDate = null,
+    DateOnly? ActualStartDate = null,
+    DateOnly? ActualEndDate = null,
+    bool IsInProgress = false,
+    DateOnly? AsOfDate = null);

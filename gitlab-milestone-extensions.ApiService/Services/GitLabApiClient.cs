@@ -280,7 +280,8 @@ public class GitLabApiClient
                     i.TimeStats?.TotalTimeSpent ?? 0,
                     i.TimeStats?.HumanTimeEstimate,
                     i.TimeStats?.HumanTotalTimeSpent,
-                    i.StartDate));
+                    i.StartDate,
+                    i.ClosedAt));
             },
             itemDescription: project => $"project issues ProjectId={project.ProjectId}, ProjectName={project.ProjectName}",
             cancellationToken);
@@ -294,6 +295,48 @@ public class GitLabApiClient
 
         return results;
     }
+
+    /// <summary>Finds the earliest MR that actually closes each selected issue, not just a related MR.</summary>
+    public async Task<IReadOnlyDictionary<(int ProjectId, int Iid), DateTimeOffset?>> GetActualStartsAsync(
+        IReadOnlyList<GitLabIssueDto> issues, CancellationToken cancellationToken)
+    {
+        using var limiter = new SemaphoreSlim(MaxConcurrentGitLabRequests);
+        var closes = new System.Collections.Concurrent.ConcurrentDictionary<(int, int),
+            Lazy<Task<List<ClosingIssueResponse>>>>();
+        async Task<List<ClosingIssueResponse>> GetClosesAsync(int projectId, int iid)
+        {
+            await limiter.WaitAsync(cancellationToken);
+            try { return await GetPagedAsync<ClosingIssueResponse>($"projects/{projectId}/merge_requests/{iid}/closes_issues", cancellationToken); }
+            finally { limiter.Release(); }
+        }
+        async Task<((int, int) Key, DateTimeOffset? Start)> FetchAsync(GitLabIssueDto issue)
+        {
+            await limiter.WaitAsync(cancellationToken);
+            List<MergeRequestResponse> candidates;
+            try { candidates = await GetPagedAsync<MergeRequestResponse>($"projects/{issue.ProjectId}/issues/{issue.Iid}/related_merge_requests", cancellationToken); }
+            finally { limiter.Release(); }
+            DateTimeOffset? earliest = null;
+            foreach (var mr in candidates)
+            {
+                var targets = await closes.GetOrAdd((mr.ProjectId, mr.Iid), key =>
+                    new Lazy<Task<List<ClosingIssueResponse>>>(() => GetClosesAsync(key.Item1, key.Item2))).Value;
+                if (targets.Any(target => target.ProjectId == issue.ProjectId && target.Iid == issue.Iid && target.Id == issue.IssueId)
+                    && mr.CreatedAt.HasValue && (!earliest.HasValue || mr.CreatedAt < earliest)) earliest = mr.CreatedAt;
+            }
+            return ((issue.ProjectId, issue.Iid), earliest);
+        }
+        var results = await Task.WhenAll(issues.DistinctBy(i => (i.ProjectId, i.Iid)).Select(FetchAsync));
+        return results.ToDictionary(x => x.Key, x => x.Start);
+    }
+
+    private sealed record MergeRequestResponse(
+        [property: JsonPropertyName("project_id")] int ProjectId,
+        [property: JsonPropertyName("iid")] int Iid,
+        [property: JsonPropertyName("created_at")] DateTimeOffset? CreatedAt);
+    private sealed record ClosingIssueResponse(
+        [property: JsonPropertyName("project_id")] int ProjectId,
+        [property: JsonPropertyName("iid")] int Iid,
+        [property: JsonPropertyName("id")] int Id);
 
     private async Task<IReadOnlyList<GitLabProjectDto>> GetProjectsForGroupsAsync(
         IReadOnlyList<GitLabGroupDto> groups,
@@ -487,6 +530,7 @@ public class GitLabApiClient
         [property: JsonPropertyName("due_date")] DateOnly? DueDate);
 
     private sealed record GitLabIssueResponse(
+        [property: JsonPropertyName("closed_at")] DateTimeOffset? ClosedAt,
         [property: JsonPropertyName("start_date")] DateOnly? StartDate,
         [property: JsonPropertyName("id")] int Id,
         [property: JsonPropertyName("iid")] int Iid,

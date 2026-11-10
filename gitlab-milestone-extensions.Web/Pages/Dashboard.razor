@@ -205,7 +205,7 @@ else
                     </MudItem>
                 </MudGrid>
 
-                <GanttChart Items="_filteredGanttItems" />
+                <GanttChart Items="_filteredGanttItems" MilestoneStart="_dashboard?.StartDate" MilestoneEnd="_dashboard?.DueDate" />
             </MudTabPanel>
         </MudTabs>
     }
