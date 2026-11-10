@@ -7,7 +7,9 @@ namespace gitlab_milestone_extensions.ApiService.Services;
 /// </summary>
 public sealed class GitLabDashboardDataService(
     IGitLabDataSnapshotService snapshotService,
-    ILogger<GitLabDashboardDataService> logger) : IDashboardDataService
+    ILogger<GitLabDashboardDataService> logger,
+    Microsoft.Extensions.Options.IOptions<Options.GitLabOptions>? options = null,
+    TimeProvider? timeProvider = null) : IDashboardDataService
 {
     public async Task<SelectionOptionsDto> GetSelectionOptionsAsync(
         int? groupId,
@@ -175,15 +177,26 @@ public sealed class GitLabDashboardDataService(
         {
             var snapshot = await snapshotService.GetSnapshotAsync(groupId, cancellationToken);
             var milestone = snapshot.Milestones.FirstOrDefault(m => m.MilestoneId == milestoneId);
-            var today = DateOnly.FromDateTime(DateTime.Today);
+            var zone = TimeZoneInfo.FindSystemTimeZoneById(options?.Value.TimeZoneId ?? "Asia/Tokyo");
+            var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime((timeProvider ?? TimeProvider.System).GetUtcNow(), zone).DateTime);
+            var selectedIssues = snapshot.Issues.Where(i => i.MilestoneId == milestoneId).ToList();
+            var actualStarts = await snapshotService.GetActualStartsAsync(selectedIssues, cancellationToken);
+            DateOnly? LocalDate(DateTimeOffset? date) => date.HasValue
+                ? DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(date.Value, zone).DateTime) : null;
 
             return snapshot.Issues
                 .Where(i => i.MilestoneId == milestoneId)
                 .Select((issue, index) =>
                 {
-                    var startDate = issue.StartDate;
+                    var startDate = milestone?.StartDate;
                     var endDate = issue.DueDate ?? milestone?.DueDate;
                     var valid = startDate.HasValue && endDate.HasValue && startDate.Value <= endDate.Value;
+                    actualStarts.TryGetValue((issue.ProjectId, issue.Iid), out var actualTimestamp);
+                    var actualStart = LocalDate(actualTimestamp);
+                    var inProgress = issue.State.Equals("opened", StringComparison.OrdinalIgnoreCase);
+                    var actualEnd = inProgress ? today : LocalDate(issue.ClosedAt);
+                    if (actualStart.HasValue && actualEnd.HasValue && actualStart > actualEnd)
+                        logger.LogWarning("Invalid actual dates for project {ProjectId} issue {Iid}", issue.ProjectId, issue.Iid);
                     return new GanttItemDto(
                         Id: issue.Iid == 0 ? index + 1 : issue.Iid,
                         Title: issue.Title,
@@ -199,16 +212,22 @@ public sealed class GitLabDashboardDataService(
                         ProjectId: issue.ProjectId,
                         ProjectName: issue.ProjectName,
                         IssueUrl: issue.WebUrl,
-                        StartDateInferred: false,
+                        StartDateInferred: true,
                         EndDateInferred: !issue.DueDate.HasValue,
-                        HasValidDates: valid);
+                        HasValidDates: valid,
+                        PlannedStartDate: startDate,
+                        PlannedEndDate: endDate,
+                        ActualStartDate: actualStart,
+                        ActualEndDate: inProgress ? null : actualEnd,
+                        IsInProgress: inProgress,
+                        AsOfDate: today);
                 })
                 .ToList();
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to build gantt. groupId={GroupId}, milestoneId={MilestoneId}", groupId, milestoneId);
-            return [];
+            throw;
         }
     }
 

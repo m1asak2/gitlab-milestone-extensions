@@ -7,12 +7,35 @@ namespace gitlab_milestone_extensions.Tests;
 public sealed class GitLabDashboardDataServiceTests
 {
     [Theory]
+    [InlineData("opened", true, false, true)]
+    [InlineData("closed", true, true, false)]
+    [InlineData("closed", true, false, false)]
+    [InlineData("opened", false, false, true)]
+    public async Task Gantt_SeparatesActualDatesFromInvalidPlan(string state, bool hasMr, bool hasClosedAt, bool ongoing)
+    {
+        var source = CreateSnapshot();
+        var issue = source.Issues[0] with { State = state, ClosedAt = hasClosedAt ? DateTimeOffset.Parse("2026-03-10T23:30:00Z") : null };
+        var snapshot = source with { Issues = [issue], Milestones = [source.Milestones[0] with { StartDate = null }] };
+        var starts = new Dictionary<(int, int), DateTimeOffset?> { [(11, 101)] = hasMr ? DateTimeOffset.Parse("2026-03-05T23:30:00Z") : null };
+        var service = new GitLabDashboardDataService(new StubSnapshotService(snapshot, starts), NullLogger<GitLabDashboardDataService>.Instance);
+
+        var item = Assert.Single(await service.GetGanttAsync(null, 201, CancellationToken.None));
+
+        Assert.False(item.HasValidDates);
+        Assert.Null(item.PlannedStartDate);
+        Assert.Equal(hasMr ? new DateOnly(2026, 3, 6) : (DateOnly?)null, item.ActualStartDate);
+        Assert.Equal(hasClosedAt ? new DateOnly(2026, 3, 11) : (DateOnly?)null, item.ActualEndDate);
+        Assert.Equal(ongoing, item.IsInProgress);
+        Assert.Equal(issue.Title, item.Title);
+    }
+
+    [Theory]
     [InlineData(5, 15, true)]
     [InlineData(10, 20, true)]
-    [InlineData(null, 15, false)]
-    [InlineData(20, 15, false)]
+    [InlineData(null, 15, true)]
+    [InlineData(20, 15, true)]
     [InlineData(5, null, true)]
-    public async Task GetGanttAsync_UsesIssueStartDateInsteadOfMilestone(int? startDay, int? endDay, bool valid)
+    public async Task GetGanttAsync_UsesMilestonePlannedStartAndIssueDueDate(int? startDay, int? endDay, bool valid)
     {
         var original = CreateSnapshot();
         var issue = original.Issues[0] with
@@ -27,14 +50,14 @@ public sealed class GitLabDashboardDataServiceTests
         var item = Assert.Single(await service.GetGanttAsync(null, 201, CancellationToken.None));
 
         Assert.Equal(valid, item.HasValidDates);
-        Assert.False(item.StartDateInferred);
+        Assert.True(item.StartDateInferred);
         Assert.Equal(!endDay.HasValue, item.EndDateInferred);
-        if (startDay.HasValue) Assert.Equal(issue.StartDate, item.StartDate);
+        Assert.Equal(original.Milestones[0].StartDate, item.PlannedStartDate);
         Assert.Equal(issue.DueDate ?? original.Milestones[0].DueDate, item.EndDate);
     }
 
     [Fact]
-    public async Task GetGanttAsync_PreservesDifferentIssueStartDatesInSameMilestone()
+    public async Task GetGanttAsync_UsesSamePlannedStartForSameMilestone()
     {
         var original = CreateSnapshot();
         var snapshot = original with
@@ -47,7 +70,7 @@ public sealed class GitLabDashboardDataServiceTests
 
         var items = await service.GetGanttAsync(null, 201, CancellationToken.None);
 
-        Assert.Equal(new[] { new DateOnly(2026, 3, 5), new DateOnly(2026, 3, 10) }, items.Select(i => i.StartDate));
+        Assert.Equal(new[] { new DateOnly(2026, 3, 1), new DateOnly(2026, 3, 1) }, items.Select(i => i.StartDate));
         Assert.All(items, item => Assert.True(item.HasValidDates));
     }
 
@@ -194,8 +217,11 @@ public sealed class GitLabDashboardDataServiceTests
         return new GitLabDataSnapshot(groups, projects, milestones, issues, DateTimeOffset.UtcNow);
     }
 
-    private sealed class StubSnapshotService(GitLabDataSnapshot snapshot) : IGitLabDataSnapshotService
+    private sealed class StubSnapshotService(GitLabDataSnapshot snapshot, IReadOnlyDictionary<(int, int), DateTimeOffset?>? starts = null) : IGitLabDataSnapshotService
     {
+        public Task<IReadOnlyDictionary<(int ProjectId, int Iid), DateTimeOffset?>> GetActualStartsAsync(IReadOnlyList<GitLabIssueDto> issues, CancellationToken cancellationToken)
+            => Task.FromResult(starts ?? (IReadOnlyDictionary<(int, int), DateTimeOffset?>)new Dictionary<(int, int), DateTimeOffset?>());
+
         public Task<IReadOnlyList<GitLabGroupDto>> GetAccessibleGroupsAsync(CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();

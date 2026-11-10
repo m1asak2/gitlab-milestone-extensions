@@ -105,6 +105,18 @@ public sealed class CachedGitLabDataSnapshotService(
         }
     }
 
+    public async Task<IReadOnlyDictionary<(int ProjectId, int Iid), DateTimeOffset?>> GetActualStartsAsync(
+        IReadOnlyList<GitLabIssueDto> issues, CancellationToken cancellationToken)
+    {
+        var tokenHash = ComputeTokenHash(GetRequiredPrivateToken(httpContextAccessor));
+        var keys = string.Join(",", issues.Select(i => $"{i.ProjectId}:{i.Iid}").Order());
+        var key = $"gitlab:actual:v1:{tokenHash}:{keys}";
+        if (memoryCache.TryGetValue<IReadOnlyDictionary<(int, int), DateTimeOffset?>>(key, out var hit) && hit is not null) return hit;
+        var result = await gitLabApiClient.GetActualStartsAsync(issues, cancellationToken);
+        memoryCache.Set(key, result, CacheDuration);
+        return result;
+    }
+
     private static string GetRequiredPrivateToken(IHttpContextAccessor httpContextAccessor)
     {
         var privateToken = httpContextAccessor.HttpContext?.Request.Headers[RequestPrivateTokenHeaderName].ToString();

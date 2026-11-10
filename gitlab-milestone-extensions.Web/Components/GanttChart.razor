@@ -7,8 +7,9 @@
         <MudSelectItem Value="@("week")">週</MudSelectItem>
         <MudSelectItem Value="@("month")">月</MudSelectItem>
     </MudSelect>
+    <span>マイルストーン: @(MilestoneStart?.ToString("yyyy-MM-dd") ?? "—") ～ @(MilestoneEnd?.ToString("yyyy-MM-dd") ?? "—")</span>
+    <span class="gantt-legend"><i class="gantt-plan-key"></i>予定（上） <i class="gantt-actual-key"></i>実績（下）</span>
 </div>
-
 @if (Items.Count == 0)
 {
     <MudText>表示するIssueがありません。</MudText>
@@ -18,48 +19,43 @@ else
     <div class="gantt-scroll">
         <div class="gantt-board" style="@($"--gantt-cell:{CellWidth}px;--gantt-width:{_columns.Count * CellWidth}px")">
             <div class="gantt-label gantt-heading">Project / Issue</div>
+            <div class="gantt-effort gantt-heading">実績 / 見積もり</div>
             <div class="gantt-timeline gantt-heading">
-                @foreach (var column in _columns)
-                {
-                    <div class="gantt-date">@ColumnLabel(column)</div>
-                }
+                @foreach (var column in _columns) { <div class="gantt-date">@ColumnLabel(column)</div> }
             </div>
             @foreach (var group in Items.GroupBy(x => x.ProjectId).OrderBy(x => x.First().ProjectName))
             {
                 var expanded = !_collapsed.Contains(group.Key);
-                <button class="gantt-label gantt-project" @onclick="() => Toggle(group.Key)">
-                    @(expanded ? "▾" : "▸") @group.First().ProjectName (@group.Count())
-                </button>
+                <button class="gantt-label gantt-project" @onclick="() => Toggle(group.Key)">@(expanded ? "▾" : "▸") @group.First().ProjectName (@group.Count())</button>
+                <div class="gantt-effort gantt-project-line"></div>
                 <div class="gantt-timeline gantt-project-line"></div>
                 @if (expanded)
                 {
-                    @foreach (var item in group.OrderBy(x => x.StartDate).ThenBy(x => x.Title))
+                    @foreach (var item in group.OrderBy(x => x.PlannedStartDate).ThenBy(x => x.Title))
                     {
                         <div class="gantt-label gantt-issue">
-                            @if (!string.IsNullOrWhiteSpace(item.IssueUrl))
-                            {
-                                <a href="@item.IssueUrl" target="_blank" rel="noopener noreferrer" title="@item.Title">@item.Title</a>
-                            }
-                            else
-                            {
-                                <span title="@item.Title">@item.Title</span>
-                            }
+                            @if (!string.IsNullOrWhiteSpace(item.IssueUrl)) { <a href="@item.IssueUrl" target="_blank" rel="noopener noreferrer" title="@item.Title">@item.Title</a> }
+                            else { <span title="@item.Title">@item.Title</span> }
                             <small>@item.Assignee</small>
                         </div>
+                        <div class="gantt-effort @(item.TimeEstimateSeconds > 0 && item.TotalTimeSpentSeconds > item.TimeEstimateSeconds ? "gantt-overrun" : "")">
+                            @Effort(item.TotalTimeSpentSeconds) / @(item.TimeEstimateSeconds > 0 ? Effort(item.TimeEstimateSeconds) : "—")
+                        </div>
                         <div class="gantt-timeline gantt-row">
-                            @if (item.HasValidDates)
+                            @if (Valid(MilestoneStart, MilestoneEnd)) { <div class="gantt-milestone" style="@BarStyle(MilestoneStart!.Value, MilestoneEnd!.Value)" title="マイルストーン期間"></div> }
+                            <div class="gantt-today" style="@FormattableString.Invariant($"left:{ColumnPosition(Today)}px")" title="今日"></div>
+                            @if (Valid(item.PlannedStartDate, item.PlannedEndDate))
                             {
-                                var left = ColumnPosition(item.StartDate);
-                                var right = ColumnPosition(item.EndDate.AddDays(1));
-                                <div class="gantt-bar @(item.Progress == 100 ? "gantt-done" : "") @(item.StartDateInferred || item.EndDateInferred ? "gantt-inferred" : "")"
-                                     style="@($"left:{left}px;width:{Math.Max(3, right-left)}px")"
-                                     title="@($"{item.Title}: {item.StartDate:yyyy-MM-dd} ～ {item.EndDate:yyyy-MM-dd} / {item.Progress}% (開始日: {(item.StartDateInferred ? "推定" : "Issue")}{(item.EndDateInferred ? "、終了日: マイルストーン由来" : "")})")">
-                                    <div class="gantt-progress" style="@($"width:{item.Progress}%")"></div>
-                                </div>
+                                <div class="gantt-bar gantt-plan @(item.StartDateInferred || item.EndDateInferred ? "gantt-inferred" : "")"
+                                     style="@BarStyle(item.PlannedStartDate!.Value, item.PlannedEndDate!.Value)"
+                                     title="@($"予定: {item.PlannedStartDate:yyyy-MM-dd} ～ {item.PlannedEndDate:yyyy-MM-dd}（開始: マイルストーン由来{(item.EndDateInferred ? "、終了: マイルストーン由来" : "") }）")"></div>
+                                @if (item.Progress < 100 && item.PlannedEndDate < Today) { <span class="gantt-overdue" style="@FormattableString.Invariant($"left:{ColumnPosition(item.PlannedEndDate.Value.AddDays(1))}px")" title="期限超過">!</span> }
                             }
-                            else
+                            @{ var actualEnd = item.IsInProgress ? Today : item.ActualEndDate; }
+                            @if (Valid(item.ActualStartDate, actualEnd))
                             {
-                                <span class="gantt-no-date">日程未設定・不正</span>
+                                <div class="gantt-bar gantt-actual @(item.IsInProgress ? "gantt-ongoing" : "")" style="@BarStyle(item.ActualStartDate!.Value, actualEnd!.Value)"
+                                     title="@($"実績: {item.ActualStartDate:yyyy-MM-dd} ～ {(item.IsInProgress ? "進行中（今日まで）" : item.ActualEndDate?.ToString("yyyy-MM-dd"))}")"></div>
                             }
                         </div>
                     }
@@ -70,6 +66,12 @@ else
 }
 
 @code {
+    [Parameter] public DateOnly? MilestoneStart { get; set; }
+    [Parameter] public DateOnly? MilestoneEnd { get; set; }
+    private DateOnly Today => Items.Select(i => i.AsOfDate).FirstOrDefault(d => d.HasValue) ?? DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeBySystemTimeZoneId(DateTimeOffset.UtcNow, "Asia/Tokyo").DateTime);
+    private static bool Valid(DateOnly? start, DateOnly? end) => start.HasValue && end.HasValue && start <= end;
+    private static string Effort(int seconds) => $"{seconds / 3600.0:0.#}h";
+    private string BarStyle(DateOnly start, DateOnly end) => FormattableString.Invariant($"left:{ColumnPosition(start)}px;width:{Math.Max(3, ColumnPosition(end.AddDays(1)) - ColumnPosition(start))}px");
     [Parameter] public IReadOnlyList<GanttItemViewModel> Items { get; set; } = [];
     private readonly HashSet<int> _collapsed = [];
     private string _scale = "week";
@@ -107,10 +109,16 @@ else
 
     private void BuildColumns()
     {
-        var valid = Items.Where(x => x.HasValidDates).ToList();
-        var today = DateOnly.FromDateTime(DateTime.Today);
-        var min = valid.Count > 0 ? valid.Min(x => x.StartDate) : today;
-        var max = valid.Count > 0 ? valid.Max(x => x.EndDate) : today;
+        var dates = new List<DateOnly> { Today };
+        if (Valid(MilestoneStart, MilestoneEnd)) { dates.Add(MilestoneStart!.Value); dates.Add(MilestoneEnd!.Value); }
+        foreach (var item in Items)
+        {
+            if (Valid(item.PlannedStartDate, item.PlannedEndDate)) { dates.Add(item.PlannedStartDate!.Value); dates.Add(item.PlannedEndDate!.Value); }
+            var actualEnd = item.IsInProgress ? Today : item.ActualEndDate;
+            if (Valid(item.ActualStartDate, actualEnd)) { dates.Add(item.ActualStartDate!.Value); dates.Add(actualEnd!.Value); }
+        }
+        var min = dates.Min();
+        var max = dates.Max();
         _origin = Floor(min);
         _columns = [];
         for (var date = _origin; date <= max && _columns.Count < 1000; date = Next(date))
