@@ -74,7 +74,7 @@ docker/
 
 - `GitLab__BaseUrl`
 
-現在の実装では、GitLab private token はブラウザから `X-GitLab-Private-Token` ヘッダで API へ送信されます。トークンの保存先は Web 側の local storage です。
+GitLab private token は API サーバーの `GitLab__PrivateToken` から取得します。ブラウザの入力・保存・ヘッダー転送は廃止しました。`docker/compose/.env.example` と `docs/shared-gitlab-token-design.md` の設定・公開範囲・ローテーション手順を参照してください。
 
 ローカルの `docker-compose` で `http://gitlab.local` を利用する場合、`api` サービスには `gitlab.local:host-gateway` の `extra_hosts` を設定し、Docker コンテナからホスト側 GitLab に到達できるようにします。
 

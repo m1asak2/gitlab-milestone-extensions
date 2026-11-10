@@ -51,6 +51,7 @@ Docker Compose から OpenShift への主な読み替え:
 
 - `ASPNETCORE_ENVIRONMENT=Production`
 - `GitLab__BaseUrl=https://<your-gitlab>`
+- `GitLab__PrivateToken`（APIだけへSecretから注入）
 - `ExposeDefaultHealthEndpoints=true`
 
 ## Security Notes
@@ -94,36 +95,23 @@ OpenShift では `api` Service 名を `api` にしておけば、そのまま名
 
 1. `api` イメージを build/push
 2. `web` イメージを build/push
-3. `openshift/*.yaml` を apply
-4. `ConfigMap` の GitLab URL を実環境値へ更新
+3. 配備先で管理しているDeployment/Service/Routeを更新
+4. `gitlab-reader` Secretを用意し、APIへの設定パッチを適用
 
 OpenShift BuildConfig に寄せることもできますが、現時点ではコンテナ化済みの成果を流用する方がシンプルです。
 
-## Sample Manifests
+## Existing Deploymentへの設定適用
 
-サンプル manifest は `openshift/` ディレクトリに配置しています。
+Deployment/Service/Route本体は配備先の管理対象です。このリポジトリには、既存の `api` Deployment・`api` コンテナに設定を追加するための `openshift/api-gitlab-settings.patch.yaml` を用意しています。
 
-- `openshift/api.yaml`
-- `openshift/web.yaml`
-
-これらは次を前提にした最小例です。
-
-- namespace 内に `api` / `web` Deployment を作る
-- `web` のみ `Route` で外部公開する
-- イメージ名は適宜置き換える
-
-## Migration Checklist
-
-1. GitLab への疎通 URL を cluster 目線で確定する
-2. `api` / `web` イメージをレジストリへ push する
-3. manifest 内のイメージ参照を置き換える
-4. `openshift/api.yaml` の `GitLab__BaseUrl` を実値に変更する
-5. `oc apply -f openshift/` を実行する
-6. `oc get pods` と `oc logs` で起動確認する
-7. `Route` 経由で UI と `/api` 疎通を確認する
+1. GitLabへの疎通URLをcluster目線で確定する。
+2. 最小権限の共通トークンを発行し、安全な入力手段で `gitlab-reader` Secret の `base-url` / `private-token` キーを設定する。値をGitやログに残さない。
+3. 対象namespaceで `oc patch deployment api --patch-file openshift/api-gitlab-settings.patch.yaml` を実行する。このファイルはDeployment本体ではないため `oc apply -f openshift/` は使用しない。
+4. `oc rollout status deployment/api` で設定反映を確認する。認証情報の更新時もAPIを再起動する。
+5. 許可された利用者だけがRouteへ到達する認証・ネットワーク制御を確認した後、UIと同一Originの `/api` 疎通を確認する。
 
 ## Notes
 
-- いまの実装では GitLab private token はブラウザの local storage に保持される
+- GitLab private token はAPIの `GitLab__PrivateToken` にSecretから注入する。ブラウザには保存しない
 - Route を TLS 終端にしても、ブラウザから見た API 呼び出しは同一 origin の `/api/...` で継続できる
-- 将来的に OpenShift Secret や SSO を使うなら、この token 受け渡し方式は見直し候補になる
+- `openshift/api-gitlab-settings.patch.yaml` と `docs/shared-gitlab-token-design.md` の手順を参照し、Ingress/Route側の認証・公開範囲を配備前に設定する

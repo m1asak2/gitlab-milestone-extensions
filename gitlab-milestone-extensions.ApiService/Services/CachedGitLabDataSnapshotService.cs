@@ -1,8 +1,7 @@
 using System.Diagnostics;
-using System.Security.Cryptography;
-using System.Text;
 using gitlab_milestone_extensions.ApiService.Models;
-using Microsoft.AspNetCore.Http;
+using gitlab_milestone_extensions.ApiService.Options;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Caching.Memory;
 
 namespace gitlab_milestone_extensions.ApiService.Services;
@@ -10,11 +9,10 @@ namespace gitlab_milestone_extensions.ApiService.Services;
 public sealed class CachedGitLabDataSnapshotService(
     IMemoryCache memoryCache,
     GitLabApiClient gitLabApiClient,
-    IHttpContextAccessor httpContextAccessor,
+    IOptions<GitLabOptions> options,
     ILogger<CachedGitLabDataSnapshotService> logger) : IGitLabDataSnapshotService
 {
-    private const string RequestPrivateTokenHeaderName = "X-GitLab-Private-Token";
-    private const string CacheKeyPrefix = "gitlab:data:snapshot:v2:";
+    private const string CacheKeyPrefix = "gitlab:data:snapshot:v3:";
     private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
     private readonly SemaphoreSlim _fetchLock = new(1, 1);
 
@@ -24,7 +22,7 @@ public sealed class CachedGitLabDataSnapshotService(
     public async Task<GitLabDataSnapshot> GetSnapshotAsync(int? groupId, CancellationToken cancellationToken)
     {
         var scopeKey = groupId?.ToString() ?? "membership";
-        var cacheKey = $"{CacheKeyPrefix}{scopeKey}:{ComputeTokenHash(GetRequiredPrivateToken(httpContextAccessor))}";
+        var cacheKey = $"{CacheKeyPrefix}{scopeKey}:{GitLabConnectionSettings.CacheIdentity(options.Value)}";
         var stopwatch = Stopwatch.StartNew();
         if (memoryCache.TryGetValue<GitLabDataSnapshot>(cacheKey, out var cacheHit) && cacheHit is not null)
         {
@@ -108,30 +106,13 @@ public sealed class CachedGitLabDataSnapshotService(
     public async Task<IReadOnlyDictionary<(int ProjectId, int Iid), DateTimeOffset?>> GetActualStartsAsync(
         IReadOnlyList<GitLabIssueDto> issues, CancellationToken cancellationToken)
     {
-        var tokenHash = ComputeTokenHash(GetRequiredPrivateToken(httpContextAccessor));
+        var tokenHash = GitLabConnectionSettings.CacheIdentity(options.Value);
         var keys = string.Join(",", issues.Select(i => $"{i.ProjectId}:{i.Iid}").Order());
         var key = $"gitlab:actual:v1:{tokenHash}:{keys}";
         if (memoryCache.TryGetValue<IReadOnlyDictionary<(int, int), DateTimeOffset?>>(key, out var hit) && hit is not null) return hit;
         var result = await gitLabApiClient.GetActualStartsAsync(issues, cancellationToken);
         memoryCache.Set(key, result, CacheDuration);
         return result;
-    }
-
-    private static string GetRequiredPrivateToken(IHttpContextAccessor httpContextAccessor)
-    {
-        var privateToken = httpContextAccessor.HttpContext?.Request.Headers[RequestPrivateTokenHeaderName].ToString();
-        if (string.IsNullOrWhiteSpace(privateToken))
-        {
-            throw new InvalidOperationException("GitLab private token is required.");
-        }
-
-        return privateToken;
-    }
-
-    private static string ComputeTokenHash(string privateToken)
-    {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(privateToken));
-        return Convert.ToHexString(bytes);
     }
 
     private async Task<GitLabGroupDto?> GetGroupOrDefaultAsync(int? groupId, CancellationToken cancellationToken)

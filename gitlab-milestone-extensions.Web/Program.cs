@@ -21,6 +21,5 @@ builder.Services.AddScoped(_ => new HttpClient
 });
 builder.Services.AddScoped<DashboardApiClient>();
 builder.Services.AddScoped<MilestoneSelectionState>();
-builder.Services.AddScoped<PrivateTokenStorage>();
 
 await builder.Build().RunAsync();

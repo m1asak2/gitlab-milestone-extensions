@@ -6,14 +6,14 @@ namespace gitlab_milestone_extensions.Tests;
 public sealed class GitLabLiveSmokeTests
 {
     private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(90);
-    private const string PrivateTokenEnvVar = "LIVE_GITLAB_TOKEN";
+    private const string PrivateTokenEnvVar = "GitLab__PrivateToken";
 
     [Fact]
     public async Task SelectionOptionsEndpoint_ReturnsSuccessAgainstLiveGitLab()
     {
         var privateToken = Environment.GetEnvironmentVariable(PrivateTokenEnvVar);
         Assert.SkipUnless(!string.IsNullOrWhiteSpace(privateToken),
-            "LIVE_GITLAB_TOKEN is not configured; live GitLab validation was not run.");
+            "GitLab__PrivateToken is not configured; live GitLab validation was not run.");
 
         var cancellationToken = TestContext.Current.CancellationToken;
         var appHost = await DistributedApplicationTestingBuilder.CreateAsync<Projects.gitlab_milestone_extensions_AppHost>(cancellationToken);
@@ -31,7 +31,6 @@ public sealed class GitLabLiveSmokeTests
 
         var httpClient = app.CreateHttpClient("apiservice");
         using var request = new HttpRequestMessage(HttpMethod.Get, "/api/selection/options");
-        request.Headers.TryAddWithoutValidation("X-GitLab-Private-Token", privateToken);
 
         using var response = await httpClient.SendAsync(request, cancellationToken);
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -47,15 +46,14 @@ public sealed class GitLabLiveSmokeTests
         }
 
         var milestoneId = milestones[0].GetProperty("milestoneId").GetInt32();
-        await AssertSuccessAsync(httpClient, $"/api/dashboard?milestoneId={milestoneId}", privateToken, cancellationToken);
-        await AssertSuccessAsync(httpClient, $"/api/issues?milestoneId={milestoneId}", privateToken, cancellationToken);
-        await AssertSuccessAsync(httpClient, $"/api/gantt?milestoneId={milestoneId}", privateToken, cancellationToken);
+        await AssertSuccessAsync(httpClient, $"/api/dashboard?milestoneId={milestoneId}", cancellationToken);
+        await AssertSuccessAsync(httpClient, $"/api/issues?milestoneId={milestoneId}", cancellationToken);
+        await AssertSuccessAsync(httpClient, $"/api/gantt?milestoneId={milestoneId}", cancellationToken);
     }
 
-    private static async Task AssertSuccessAsync(HttpClient httpClient, string url, string privateToken, CancellationToken cancellationToken)
+    private static async Task AssertSuccessAsync(HttpClient httpClient, string url, CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
-        request.Headers.TryAddWithoutValidation("X-GitLab-Private-Token", privateToken);
 
         using var response = await httpClient.SendAsync(request, cancellationToken);
         var body = await response.Content.ReadAsStringAsync(cancellationToken);

@@ -151,7 +151,7 @@ public sealed class GitLabDashboardDataService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to build dashboard. groupId={GroupId}, milestoneId={MilestoneId}", groupId, milestoneId);
-            return null;
+            throw;
         }
     }
 
@@ -167,7 +167,7 @@ public sealed class GitLabDashboardDataService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to build issues list. groupId={GroupId}, milestoneId={MilestoneId}", groupId, milestoneId);
-            return [];
+            throw;
         }
     }
 

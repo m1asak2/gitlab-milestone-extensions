@@ -5,7 +5,6 @@ namespace gitlab_milestone_extensions.Web.Services;
 
 public sealed class DashboardApiClient(HttpClient httpClient, MilestoneSelectionState selectionState)
 {
-    private const string RequestPrivateTokenHeaderName = "X-GitLab-Private-Token";
 
     public Task<GitLabCurrentUserViewModel?> GetCurrentUserAsync(CancellationToken cancellationToken = default)
         => GetFromApiAsync<GitLabCurrentUserViewModel>("api/gitlab/user", cancellationToken);
@@ -69,14 +68,7 @@ public sealed class DashboardApiClient(HttpClient httpClient, MilestoneSelection
 
     private async Task<T?> GetFromApiAsync<T>(string url, CancellationToken cancellationToken)
     {
-        if (!selectionState.HasPrivateToken)
-        {
-            throw new InvalidOperationException("GitLab private token is required.");
-        }
-
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
-        request.Headers.TryAddWithoutValidation(RequestPrivateTokenHeaderName, selectionState.PrivateToken);
-
         using var response = await httpClient.SendAsync(request, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
