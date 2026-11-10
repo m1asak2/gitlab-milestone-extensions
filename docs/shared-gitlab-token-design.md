@@ -1,6 +1,6 @@
 # GitLab共通トークン移行 詳細設計（Issue #5）
 
-> 状態: 実装前の合意仕様。既存のユーザートークン方式は移行完了まで有効。
+> 状態: 実装済み。共通トークンはAPIサーバー設定のみを使用し、ブラウザトークン方式は廃止。
 
 ## 目的
 ユーザーがGitLabトークンを入力する方式を廃止し、アプリ全体で単一のGitLab読み取りトークンを使用する。秘密値はAPIサーバーに限定し、Blazor WebAssemblyや静的配信ファイルには絶対に含めない。
@@ -47,3 +47,17 @@ Secretを作成し、API Deploymentの `env[].valueFrom.secretKeyRef` から `Gi
 
 ## 実装運用
 Issue #5 / 独立Draft PRで管理。Issue #4のPRに依存させない。マージはレビューとユーザー承認後。
+
+## 設定・移行手順
+1. APIプロセスだけに `GitLab__BaseUrl` と `GitLab__PrivateToken` を設定する。Web/WASMの設定やビルド引数には入れない。未設定はAPIデータ要求に503、GitLab認証失敗は秘密値なしの502を返す。
+2. Composeは `docker/compose/.env.example` を参考に、Git管理しない `.env` に設定する。設定はapiサービスだけへ渡す。`docker compose config` の展開済み出力も秘密値を含むため保存・共有しない。
+3. OpenShiftは既存api Deploymentに `openshift/api-gitlab-settings.patch.yaml` を適用する。`gitlab-reader` Secretを安全な値入力手段で別途作成し、`base-url` / `private-token` キーを用意する。Secret値をマニフェストやCIログへ出さない。
+4. 利用者ごとのGitLab認可は引き継がれない。配備前にIngress/Route側で組織の認証・ネットワーク制限を設定し、この共通アカウントの閲覧範囲全体を公開してよい利用者に限定する。APIの任意Origin許可は撤去し、Webと同一Originのリバースプロキシを使う。
+5. トークンはread_api等の必要最小限の権限を持つ専用アカウントで発行。ローテーションはSecret/環境変数更新後APIを再起動する。キャッシュキーは接続先・トークンをハッシュ化した識別子を含み、新旧トークンで共有しない。
+6. ブラウザに保存済みの旧 `gitlab.privateToken` は初期HTMLで削除する。保存・復元・ヘッダー転送は行わない。
+
+## 検証
+- ローカルGitLabスタブと実ApiServiceを使い、サーバートークン送信、ブラウザ指定値の無視、設定欠落、401/403の安全な応答、CORS全許可の撤去を統合テスト。
+- キャッシュ再利用とトークン変更時の分離、既存選択UIを回帰検証。
+- Chromiumで入力UIなしのデータ表示、送信ヘッダー、旧LocalStorage削除、担当者フィルタとブラウザエラーなしを確認。
+- 実GitLab用テストは `GitLab__BaseUrl` / `GitLab__PrivateToken` をAPIプロセスに設定して別途実行。実トークンや配備先への接続はこの変更に含めない。

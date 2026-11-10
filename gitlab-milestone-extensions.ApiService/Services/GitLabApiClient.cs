@@ -6,7 +6,6 @@ using System.Text.Json.Serialization;
 using gitlab_milestone_extensions.ApiService.Models;
 using gitlab_milestone_extensions.ApiService.Options;
 
-using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 
 namespace gitlab_milestone_extensions.ApiService.Services;
@@ -14,32 +13,30 @@ namespace gitlab_milestone_extensions.ApiService.Services;
 public class GitLabApiClient
 {
     private const string ClientPrivateTokenHeaderName = "PRIVATE-TOKEN";
-    private const string RequestPrivateTokenHeaderName = "X-GitLab-Private-Token";
     private const int MaxConcurrentGitLabRequests = 4;
     private readonly HttpClient _httpClient;
-    private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly string _privateToken;
     private readonly ILogger<GitLabApiClient> _logger;
 
     public GitLabApiClient(
         HttpClient httpClient,
         IOptions<GitLabOptions> options,
-        IHttpContextAccessor httpContextAccessor,
         ILogger<GitLabApiClient> logger)
     {
         var opt = options.Value;
-        _httpContextAccessor = httpContextAccessor;
+        _privateToken = GitLabConnectionSettings.Token(opt);
         _logger = logger;
 
-        httpClient.BaseAddress = new Uri($"{opt.BaseUrl.TrimEnd('/')}/api/v4/");
+        httpClient.BaseAddress = GitLabConnectionSettings.ApiBase(opt);
         httpClient.DefaultRequestHeaders.Accept.Add(
             new MediaTypeWithQualityHeaderValue("application/json"));
 
         _httpClient = httpClient;
+        _httpClient.DefaultRequestHeaders.TryAddWithoutValidation(ClientPrivateTokenHeaderName, _privateToken);
     }
 
     public async Task<T?> GetAsync<T>(string url, CancellationToken cancellationToken = default)
     {
-        ApplyPrivateTokenHeader();
         var stopwatch = Stopwatch.StartNew();
         try
         {
@@ -348,7 +345,6 @@ public class GitLabApiClient
 
     private async Task<List<T>> GetPagedAsync<T>(string url, CancellationToken cancellationToken = default)
     {
-        ApplyPrivateTokenHeader();
         var allItems = new List<T>();
         var page = 1;
 
@@ -392,18 +388,6 @@ public class GitLabApiClient
         }
 
         return allItems;
-    }
-
-    private void ApplyPrivateTokenHeader()
-    {
-        var privateToken = _httpContextAccessor.HttpContext?.Request.Headers[RequestPrivateTokenHeaderName].ToString();
-        if (string.IsNullOrWhiteSpace(privateToken))
-        {
-            throw new InvalidOperationException("GitLab private token is required.");
-        }
-
-        _httpClient.DefaultRequestHeaders.Remove(ClientPrivateTokenHeaderName);
-        _httpClient.DefaultRequestHeaders.TryAddWithoutValidation(ClientPrivateTokenHeaderName, privateToken);
     }
 
     private static void ValidateGroupId(int groupId)
@@ -458,6 +442,7 @@ public class GitLabApiClient
             return false;
         }
 
+        if (ex is HttpRequestException { StatusCode: System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden }) return false;
         return ex is HttpRequestException or TaskCanceledException;
     }
 

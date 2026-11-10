@@ -3,58 +3,22 @@
 @inject DashboardApiClient ApiClient
 @inject NavigationManager NavigationManager
 @inject MilestoneSelectionState SelectionState
-@inject PrivateTokenStorage PrivateTokenStorage
 
 <MudLayout>
     <MudAppBar Elevation="1">
-        <MudLink Href="/" OnClick="NavigateHomeAsync" Underline="Underline.None" Class="text-decoration-none"
-                 Style="color: white;">
-            <MudText Typo="Typo.h6" Color="Color.Inherit" Style="color: white;">GitLab Milestone Dashboard</MudText>
+        <MudLink Href="/" OnClick="NavigateHomeAsync" Underline="Underline.None" Style="color:white">
+            <MudText Typo="Typo.h6" Color="Color.Inherit">GitLab Milestone Dashboard</MudText>
         </MudLink>
-        <MudSpacer />
-        @if (_currentGitLabUser is not null)
-        {
-            <div class="d-flex align-center mr-3">
-                <img src="images/gitlab-mark.svg" alt="GitLab" style="width: 20px; height: 20px;" />
-                <MudText Typo="Typo.body2" Class="ml-2">@_currentGitLabUser.Name</MudText>
-            </div>
-        }
-        @if (SelectionState.HasPrivateToken && !_isTokenEditorVisible)
-        {
-            <MudButton Variant="Variant.Text" Color="Color.Inherit" OnClick="ShowTokenEditor">
-                Change Token
-            </MudButton>
-        }
     </MudAppBar>
-
     <MudMainContent>
         <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-6 pb-8">
             <MudPaper Class="pa-4 mb-4">
-                @if (_isTokenEditorVisible)
-                {
-                    <MudGrid Class="mb-4">
-                        <MudItem xs="12" md="8">
-                            <label class="selector-label" for="private-token-input">GitLab Private Token</label>
-                            <input id="private-token-input" class="selector-input" type="password"
-                                   value="@(_privateTokenInput ?? string.Empty)"
-                                   @oninput="@(args => _privateTokenInput = args.Value?.ToString())"
-                                   placeholder="GitLab の Private Token を入力" />
-                        </MudItem>
-                        <MudItem xs="12" md="4" Class="d-flex align-end">
-                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ApplyPrivateTokenAsync"
-                                       Disabled="@_isLoadingSelectors">
-                                Apply Token
-                            </MudButton>
-                        </MudItem>
-                    </MudGrid>
-                }
-
                 <MudGrid>
                     <MudItem xs="12" sm="6" md="3">
                         <label class="selector-label" for="group-select">Group</label>
                         <select id="group-select" class="selector-input"
                                 value="@(_selectedGroupId?.ToString() ?? string.Empty)" @onchange="OnGroupChanged"
-                                disabled="@(_isLoadingSelectors || !SelectionState.HasPrivateToken)">
+                                disabled="@(_isLoadingSelectors)">
                             <option value="">Select Group</option>
                             @foreach (var group in _groups)
                             {
@@ -66,7 +30,7 @@
                         <label class="selector-label" for="member-select">Member</label>
                         <select id="member-select" class="selector-input"
                                 value="@(_selectedMemberId?.ToString() ?? string.Empty)" @onchange="OnMemberChanged"
-                                disabled="@(_isLoadingSelectors || !SelectionState.HasPrivateToken)">
+                                disabled="@(_isLoadingSelectors)">
                             <option value="">Select Member</option>
                             @foreach (var member in _members)
                             {
@@ -78,7 +42,7 @@
                         <label class="selector-label" for="project-select">Project</label>
                         <select id="project-select" class="selector-input"
                                 value="@(_selectedProjectId?.ToString() ?? string.Empty)" @onchange="OnProjectChanged"
-                                disabled="@(_isLoadingSelectors || !SelectionState.HasPrivateToken)">
+                                disabled="@(_isLoadingSelectors)">
                             <option value="">Select Project</option>
                             @foreach (var project in _projects)
                             {
@@ -90,7 +54,7 @@
                         <label class="selector-label" for="milestone-select">Milestone</label>
                         <select id="milestone-select" class="selector-input"
                                 value="@(_selectedMilestoneId?.ToString() ?? string.Empty)" @onchange="OnMilestoneChanged"
-                                disabled="@(_isLoadingSelectors || !SelectionState.HasPrivateToken)">
+                                disabled="@(_isLoadingSelectors)">
                             <option value="">Select Milestone</option>
                             @foreach (var milestone in VisibleMilestones)
                             {
@@ -100,25 +64,17 @@
                         <label class="selector-checkbox mt-2" for="closed-toggle">
                             <input id="closed-toggle" type="checkbox" checked="@_hideClosedMilestones"
                                    @onchange="OnHideClosedMilestonesChanged"
-                                   disabled="@(_isLoadingSelectors || !SelectionState.HasPrivateToken)" />
+                                   disabled="@(_isLoadingSelectors)" />
                             <span>Closedを隠す</span>
                         </label>
                     </MudItem>
                 </MudGrid>
-
-                @if (_isTokenEditorVisible)
-                {
-                    <MudAlert Class="mt-3" Severity="Severity.Info">
-                        GitLab の参照が必要なときだけ Private Token を入力してください。入力後はブラウザに保存し、次回は入力欄を非表示にします。
-                    </MudAlert>
-                }
 
                 @if (!string.IsNullOrWhiteSpace(_selectorError))
                 {
                     <MudAlert Class="mt-3" Severity="Severity.Error">@_selectorError</MudAlert>
                 }
             </MudPaper>
-
             @Body
         </MudContainer>
     </MudMainContent>
@@ -126,12 +82,9 @@
 
 @code {
     private bool _isLoadingSelectors;
-    private bool _isTokenEditorVisible = true;
     private bool _isApplyingSelectionFromUrl;
     private bool _isUpdatingUrlFromSelection;
     private string? _selectorError;
-    private string? _privateTokenInput;
-    private GitLabCurrentUserViewModel? _currentGitLabUser;
 
     private int? _selectedGroupId;
     private int? _selectedMemberId;
@@ -151,9 +104,7 @@
         SelectionState.Changed += OnSelectionStateChanged;
         NavigationManager.LocationChanged += OnLocationChanged;
         ApplySelectionFromUrl(NavigationManager.Uri);
-        var rememberedToken = await PrivateTokenStorage.GetAsync();
-        _privateTokenInput = rememberedToken;
-        await InitializeTokenAsync(rememberedToken, saveIfValid: false);
+        await LoadSelectionOptionsAsync();
     }
 
     public void Dispose()
@@ -168,17 +119,6 @@
         _selectedGroupId = value;
         SelectionState.SetGroup(value);
         await LoadSelectionOptionsAsync();
-    }
-
-    private async Task ApplyPrivateTokenAsync()
-    {
-        await InitializeTokenAsync(_privateTokenInput, saveIfValid: true);
-    }
-
-    private void ShowTokenEditor()
-    {
-        _privateTokenInput = SelectionState.PrivateToken;
-        _isTokenEditorVisible = true;
     }
 
     private Task NavigateHomeAsync(MouseEventArgs _)
@@ -220,7 +160,6 @@
 
     private void OnSelectionStateChanged()
     {
-        _privateTokenInput = SelectionState.PrivateToken;
         _selectedGroupId = SelectionState.SelectedGroupId;
         _selectedMemberId = SelectionState.SelectedMemberId;
         _selectedProjectId = SelectionState.SelectedProjectId;
@@ -243,10 +182,7 @@
         ApplySelectionFromUrl(args.Location);
         _ = InvokeAsync(async () =>
         {
-            if (SelectionState.HasPrivateToken)
-            {
-                await LoadSelectionOptionsAsync();
-            }
+            await LoadSelectionOptionsAsync();
 
             StateHasChanged();
         });
@@ -254,22 +190,6 @@
 
     private async Task LoadSelectionOptionsAsync()
     {
-        if (!SelectionState.HasPrivateToken)
-        {
-            _isLoadingSelectors = false;
-            _selectorError = null;
-            _isTokenEditorVisible = true;
-            _currentGitLabUser = null;
-            _groups = [];
-            _members = [];
-            _projects = [];
-            _milestones = [];
-            _selectedGroupId = null;
-            _selectedMemberId = null;
-            _selectedProjectId = null;
-            _selectedMilestoneId = null;
-            return;
-        }
 
         _isLoadingSelectors = true;
         _selectorError = null;
@@ -342,49 +262,6 @@
         finally
         {
             _isLoadingSelectors = false;
-        }
-    }
-
-    private async Task InitializeTokenAsync(string? token, bool saveIfValid)
-    {
-        _selectorError = null;
-        _currentGitLabUser = null;
-        SelectionState.SetPrivateToken(token);
-        _privateTokenInput = SelectionState.PrivateToken;
-
-        if (!SelectionState.HasPrivateToken)
-        {
-            await PrivateTokenStorage.RemoveAsync();
-            _isTokenEditorVisible = true;
-            await LoadSelectionOptionsAsync();
-            return;
-        }
-
-        try
-        {
-            _currentGitLabUser = await ApiClient.GetCurrentUserAsync()
-                ?? throw new InvalidOperationException("GitLab user could not be resolved from the provided token.");
-
-            await LoadSelectionOptionsAsync();
-            _isTokenEditorVisible = false;
-
-            if (saveIfValid)
-            {
-                await PrivateTokenStorage.SetAsync(SelectionState.PrivateToken!);
-            }
-        }
-        catch (Exception ex)
-        {
-            _selectorError = ex.Message;
-            _currentGitLabUser = null;
-            _isTokenEditorVisible = true;
-            _privateTokenInput = token;
-            SelectionState.SetPrivateToken(null);
-            _groups = [];
-            _members = [];
-            _projects = [];
-            _milestones = [];
-            await PrivateTokenStorage.RemoveAsync();
         }
     }
 

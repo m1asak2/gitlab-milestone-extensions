@@ -20,17 +20,8 @@
         <a class="dismiss">x</a>
     </div>
     <script>
-        window.gitlabMilestoneExtensionsTokenStore = {
-            get: function (key) {
-                return window.localStorage.getItem(key);
-            },
-            set: function (key, value) {
-                window.localStorage.setItem(key, value);
-            },
-            remove: function (key) {
-                window.localStorage.removeItem(key);
-            }
-        };
+        // Remove credentials persisted by versions before the server-token migration.
+        try { window.localStorage.removeItem('gitlab.privateToken'); } catch { }
     </script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
     <script src="_framework/blazor.webassembly.js"></script>

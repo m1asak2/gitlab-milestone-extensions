@@ -37,7 +37,7 @@ public sealed class GitLabApiClientTests
         var handler = new StubHttpMessageHandler(request =>
         {
             Assert.Equal("/api/v4/user", request.RequestUri?.AbsolutePath);
-            Assert.Equal("user-token", request.Headers.GetValues("PRIVATE-TOKEN").Single());
+            Assert.Equal("server-test-token", request.Headers.GetValues("PRIVATE-TOKEN").Single());
 
             return CreateJsonResponse(new
             {
@@ -63,7 +63,7 @@ public sealed class GitLabApiClientTests
         {
             Assert.Equal("/api/v4/projects/101/milestones", request.RequestUri?.AbsolutePath);
             Assert.Equal("per_page=100&page=1", request.RequestUri?.Query.TrimStart('?'));
-            Assert.Equal("user-token", request.Headers.GetValues("PRIVATE-TOKEN").Single());
+            Assert.Equal("server-test-token", request.Headers.GetValues("PRIVATE-TOKEN").Single());
 
             return CreateJsonResponse(new[]
             {
@@ -130,7 +130,7 @@ public sealed class GitLabApiClientTests
         var snapshotService = new CachedGitLabDataSnapshotService(
             memoryCache,
             apiClient,
-            httpContextAccessor,
+            Options.Create(new GitLabOptions { BaseUrl = "https://gitlab.example.local", PrivateToken = "server-test-token" }),
             NullLogger<CachedGitLabDataSnapshotService>.Instance);
 
         var snapshot = await snapshotService.GetSnapshotAsync(4, CancellationToken.None);
@@ -223,6 +223,7 @@ public sealed class GitLabApiClientTests
         var httpClient = new HttpClient(handler);
         var options = Options.Create(new GitLabOptions
         {
+            PrivateToken = "server-test-token",
             BaseUrl = "https://gitlab.example.local"
         });
         httpContextAccessor ??= CreateHttpContextAccessor();
@@ -230,7 +231,6 @@ public sealed class GitLabApiClientTests
         return new GitLabApiClient(
             httpClient,
             options,
-            httpContextAccessor,
             NullLogger<GitLabApiClient>.Instance);
     }
 

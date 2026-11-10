@@ -7,27 +7,18 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<GitLabExceptionHandler>();
 builder.Services.AddOpenApi();
 builder.Services.AddMemoryCache();
-builder.Services.AddHttpContextAccessor();
 builder.Services.Configure<GitLabOptions>(builder.Configuration.GetSection("GitLab"));
-builder.Services.AddHttpClient<GitLabApiClient>();
+builder.Services.AddHttpClient<GitLabApiClient>()
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 builder.Services.AddScoped<IGitLabDataSnapshotService, CachedGitLabDataSnapshotService>();
-builder.Services.AddCors(options =>
-{
-    options.AddDefaultPolicy(policy =>
-    {
-        policy.AllowAnyOrigin()
-            .AllowAnyHeader()
-            .AllowAnyMethod();
-    });
-});
 builder.Services.AddScoped<IDashboardDataService, GitLabDashboardDataService>();
 
 var app = builder.Build();
 
 app.UseExceptionHandler();
-app.UseCors();
 
 if (app.Environment.IsDevelopment())
 {
